@@ -177,6 +177,9 @@ function showError(msg) {
 // ---------------------------------------------------------------- curve
 
 function setSpec(spec, { writeInput = false, refit = true, flash = false } = {}) {
+  // Predict from exactly what "Copy for mod settings" hands the game: the
+  // serialized string, parsed back (serialize keeps 6 significant digits).
+  spec = Curve.parse(serialize(spec))[0];
   state.spec = spec;
   state.rows = Model.predict(state.techs, spec);
   const text = serialize(spec);
