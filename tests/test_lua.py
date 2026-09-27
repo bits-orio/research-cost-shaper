@@ -237,5 +237,78 @@ class ShapeTest(unittest.TestCase):
         self.assertEqual(out.techs["inf"].max_level, "infinite")
 
 
+
+class CheckTest(unittest.TestCase):
+    """lib/check: planned costs vs the game's final prototypes."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.lua = lua_runtime()
+        cls.lua.execute("""
+            check = require("lib.check")
+            planned = {
+                a = { count = 20, time = 5 },
+                b = { count = 450, time = 10 },
+                inf = { formula = "(2^L*1000)*50", time = 60 },
+                t = { trigger = true },
+                gone = { count = 7, time = 1 },
+            }
+        """)
+
+    def compare(self, actual_lua):
+        r = self.lua.eval("function(a) return check.compare(planned, a) end")(self.lua.eval(actual_lua))
+        names = lambda t: [t[i] if isinstance(t[i], str) else t[i].name for i in range(1, len(t) + 1)]
+        return r, names(r.changed), names(r.added), names(r.missing)
+
+    def test_clean_when_everything_matches(self):
+        r, changed, added, missing = self.compare("""{
+            a = { count = 20, time = 5, costed = true }, b = { count = 450, time = 10, costed = true },
+            inf = { formula = "(2^L*1000)*50", time = 60, costed = true }, t = { count = 0, time = 0, costed = false },
+            gone = { count = 7, time = 1, costed = true } }""")
+        self.assertEqual((changed, added, missing, r.checked), ([], [], [], 4))
+        self.assertTrue(self.lua.eval("check.clean")(r, 1))
+        self.assertFalse(self.lua.eval("check.clean")(r, 3))
+
+    def test_reports_changed_added_and_removed(self):
+        r, changed, added, missing = self.compare("""{
+            a = { count = 40, time = 5, costed = true }, b = { count = 450, time = 99, costed = true },
+            inf = { formula = "2^L*1000", time = 60, costed = true }, t = { count = 0, time = 0, costed = false },
+            newcomer = { count = 5, time = 1, costed = true }, freebie = { count = 0, time = 0, costed = false } }""")
+        self.assertEqual(changed, ["a", "b", "inf"])
+        self.assertEqual([r.changed[i].what for i in (1, 2, 3)], ["count", "time", "formula"])
+        self.assertEqual(added, ["newcomer"])  # trigger-only additions aren't flagged
+        self.assertEqual(missing, ["gone"])
+
+    def test_map_price_multiplier_is_expected_not_flagged(self):
+        self.lua.execute('planned.free = { count = 10, time = 1, exempt = true }')
+        try:
+            r = self.lua.eval("function(a) return check.compare(planned, a, 3) end")(self.lua.eval("""{
+                a = { count = 60, time = 5, costed = true }, b = { count = 1351, time = 10, costed = true },
+                inf = { formula = "(2^L*1000)*50", time = 60, costed = true }, gone = { count = 21, time = 1, costed = true },
+                free = { count = 10, time = 1, costed = true } }"""))
+            self.assertEqual(len(r.changed), 0)  # b: 450*3 = 1350, off by one rounding is fine; free opts out
+            self.assertFalse(self.lua.eval("check.clean")(r, 3))  # but the multiplier itself is still reported
+        finally:
+            self.lua.execute('planned.free = nil')
+
+    def test_planned_comes_from_the_shaping_plan(self):
+        out = self.lua.eval("""(function()
+            local techs, shape, curve = require("lib.techs"), require("lib.shape"), require("lib.curve")
+            local raw = {
+                t = { name = "t" },
+                a = { name = "a", prerequisites = { "t" }, unit = { count = 10, time = 5, ingredients = { { "red", 1 } } } },
+                inf = { name = "inf", prerequisites = { "a" }, unit = { count_formula = "2^L", time = 60, ingredients = { { "red", 1 } } } },
+            }
+            local snap = techs.snapshot(raw)
+            return check.planned(snap, shape.plan(snap, (curve.parse("v1;pts=0:3;time=2"))))
+        end)()""")
+        self.assertTrue(out.t.trigger)
+        self.assertEqual((out.a.count, out.a.time), (30, 10))
+        self.assertEqual((out.inf.formula, out.inf.time), ("(2^L)*3", 120))
+
+    def test_names_lists_a_few_then_counts(self):
+        self.assertEqual(self.lua.eval('check.names({"a","b","c","d"}, 2)'), "a, b and 2 more")
+
+
 if __name__ == "__main__":
     unittest.main()

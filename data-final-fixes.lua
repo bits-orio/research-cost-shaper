@@ -3,6 +3,7 @@ local techs = require("lib.techs")
 local shape = require("lib.shape")
 local report = require("lib.report")
 local export = require("lib.export")
+local check = require("lib.check")
 
 local OUTPUT_DIR = "research-cost-shaper/"
 
@@ -37,11 +38,12 @@ log(
         .. " characters)"
 )
 
--- Same export for the in-game /rcs-export window.
+-- Same export for the in-game /rcs-export window, plus what this mod left
+-- each tech with, so the running game can check nothing changed it later.
 data:extend({
     {
         type = "mod-data",
         name = "research-cost-shaper",
-        data = { export = export_string, page_url = export.PAGE_URL },
+        data = { export = export_string, page_url = export.PAGE_URL, planned = check.planned(snapshot, plan) },
     },
 })

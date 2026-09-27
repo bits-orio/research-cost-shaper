@@ -11,7 +11,10 @@ Early development, targeting Factorio 2.0 (2.1 build to follow from the same
 code). The mod applies the curve at every game launch to whatever techs your
 modpack has. At each launch it also writes `rcs-report.txt` (per-tech costs) and
 `rcs-export.txt` (for the companion page) to `script-output/research-cost-shaper/`;
-`/rcs-export` shows the same export in game. Load that export into the
+`/rcs-export` shows the same export in game. When a game starts, the mod checks
+that every tech still has the cost it set (a mod loading later, or the map's
+technology price multiplier, can change them) and tells admins if not;
+`/rcs-check` runs the check on demand. Load that export into the
 [companion page](https://bits-orio.github.io/research-cost-shaper/) to design
 a curve against your modpack's tech tree and copy it back into the setting.
 

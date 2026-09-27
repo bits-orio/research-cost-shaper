@@ -16,7 +16,8 @@ function export_window.close(player)
     end
 end
 
-function export_window.open(player)
+--- @param check_lines LocalisedString[] result of the cost check, shown on top
+function export_window.open(player, check_lines)
     export_window.close(player)
     local data = stored()
     local frame = player.gui.screen.add({
@@ -26,6 +27,14 @@ function export_window.open(player)
         caption = { "rcs.export-title" },
     })
     frame.auto_center = true
+
+    -- Whether the game's costs are the ones this export describes.
+    for _, line in ipairs(check_lines or {}) do
+        local label = frame.add({ type = "label", caption = line })
+        label.style.single_line = false
+        label.style.maximal_width = 600
+        label.style.font_color = storage.check and storage.check.clean and { 0.55, 0.9, 0.55 } or { 1, 0.7, 0.3 }
+    end
 
     frame.add({ type = "label", caption = { "rcs.export-step-page" } })
     local url = frame.add({ type = "textfield", text = data.page_url })
