@@ -14,7 +14,7 @@ modpack has. At each launch it also writes `rcs-report.txt` (per-tech costs) and
 `/rcs-export` shows the same export in game. When a game starts, the mod checks
 that every tech still has the cost it set (a mod loading later, or the map's
 technology price multiplier, can change them) and tells admins if not;
-`/rcs-check` runs the check on demand. Load that export into the
+`/rcs-check` runs the check on demand. Load `rcs-export.txt` into the
 [companion page](https://bits-orio.github.io/research-cost-shaper/) to design
 a curve against your modpack's tech tree and copy it back into the setting.
 
