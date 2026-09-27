@@ -7,8 +7,8 @@ each tech's new cost before you start a run.
 
 ## Status
 
-Early development. The curve maths is done and tested; the mod does not
-change costs yet.
+Early development, targeting Factorio 2.0. The curve maths is done and
+tested; the mod does not change costs yet.
 
 ## How it works
 
@@ -19,6 +19,20 @@ change costs yet.
    drawn as a smooth monotone curve in log space.
 3. The curve is one line of text, e.g. `v1; pts=0:2, 0.5:4, 1:10`, which you
    paste into the mod setting. Full format: [spec/curve-format.md](spec/curve-format.md).
+
+## Credits
+
+Research Cost Shaper grew out of a lot of runs with
+[Technology Overload](https://mods.factorio.com/mod/technology-overload) by
+RedRafe ([source](https://github.com/RedRafe/technology-overload)). It has been
+a regular on my weekly server for a long time. Technology Overload showed that
+research cost doesn't have to be one flat multiplier: its Funnel, Spiral and
+Fibonacci modes shape costs across the whole tech tree. This mod takes that
+idea and lets you draw the shape yourself.
+
+It is a separate mod with its own code, not a fork, and RedRafe is not
+involved in it. If you like fixed, well-tested presets, Technology Overload is
+well worth a look.
 
 ## Layout
 
