@@ -254,8 +254,11 @@ dialog .field input { font-weight: 400; width: 100%; }
 details.mods summary { cursor: pointer; color: var(--accent); }
 details.mods ul { position: absolute; z-index: 6; margin: 4px 0 0; padding: 8px 12px 8px 26px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; max-height: 50vh; overflow: auto; min-width: 240px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.18); }
 details.mods li { margin: 2px 0; }
-details.mods a { color: var(--text); text-decoration: underline; text-decoration-color: var(--line); }
-details.mods a:hover { color: var(--accent); text-decoration-color: currentColor; }
+details.mods a { color: var(--share); font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; }
+details.mods a:hover { text-decoration: underline; text-underline-offset: 2px; }
+details.mods a .ext { width: 12px; height: 12px; opacity: 0.8; }
+details.mods li.built-in { color: var(--muted); }
+details.mods li.built-in.first { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
 
 /* tree colour switch and legend */
 .seg { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
