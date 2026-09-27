@@ -11,8 +11,9 @@ Early development, targeting Factorio 2.0 (2.1 build to follow from the same
 code). The mod applies the curve at every game launch to whatever techs your
 modpack has. At each launch it also writes `rcs-report.txt` (per-tech costs) and
 `rcs-export.txt` (for the companion page) to `script-output/research-cost-shaper/`;
-`/rcs-export` shows the same export in game. The companion page is not built
-yet.
+`/rcs-export` shows the same export in game. Load that export into the
+[companion page](https://bits-orio.github.io/research-cost-shaper/) to design
+a curve against your modpack's tech tree and copy it back into the setting.
 
 ## How it works
 
@@ -42,7 +43,8 @@ well worth a look.
 
 ```
 info.json, settings.lua, lib/, locale/   the mod
-site/                                    companion web page (GitHub Pages)
+site/                                    companion web page (GitHub Pages, no build step;
+                                         serve locally with python3 -m http.server)
 spec/                                    curve format and shared test cases
 tests/                                   Lua (5.2, via lupa) and JS tests
 tools/test.sh                            runs both test suites

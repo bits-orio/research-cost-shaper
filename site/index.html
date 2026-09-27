@@ -4,14 +4,121 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Research Cost Shaper</title>
-<style>
-  :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
-  body { max-width: 40rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
-</style>
+<meta name="description" content="Design a research cost curve for Factorio and preview every tech's new cost for your modpack.">
+<link rel="stylesheet" href="style.css">
+<script src="curve.js"></script>
+<script src="model.js"></script>
+<script type="module" src="app.js"></script>
 </head>
 <body>
-<h1>Research Cost Shaper</h1>
-<p>The companion page for designing and previewing research cost curves is being built.</p>
-<p>Mod source and progress: <a href="https://github.com/bits-orio/research-cost-shaper">github.com/bits-orio/research-cost-shaper</a></p>
+<header class="top">
+  <div class="brand">
+    <h1>Research Cost Shaper</h1>
+    <p class="muted">Curve designer for the Factorio mod. Everything runs in your browser; nothing is uploaded.</p>
+  </div>
+  <div class="load">
+    <label class="button primary">Open rcs-export.txt<input type="file" id="file-input" accept=".txt,text/plain" hidden></label>
+    <button class="button" id="paste-open">Paste export</button>
+    <select id="sample-select" class="button" aria-label="Load a sample">
+      <option value="">Samples…</option>
+      <option value="space-age-2.0">Space Age (2.0)</option>
+      <option value="vanilla-2.0">Vanilla (2.0)</option>
+    </select>
+  </div>
+</header>
+
+<p id="load-error" class="banner error" hidden></p>
+<p id="sample-banner" class="banner" hidden>
+  You're looking at sample data. To see your own modpack, open <code>script-output/research-cost-shaper/rcs-export.txt</code>
+  from your Factorio folder (the mod writes it every time Factorio starts), drop it anywhere on this page, or paste the text from <code>/rcs-export</code> in game.
+</p>
+<div id="source" class="source"></div>
+
+<main>
+  <section class="curve-panel">
+    <div class="chart-wrap">
+      <svg id="chart" role="img" aria-label="Cost multiplier curve"></svg>
+      <div id="chart-tip" class="tip" hidden></div>
+      <p class="hint muted">Drag a point to move it. Double-click empty space to add a point, double-click a point to remove it. Coloured lines mark where each science pack is unlocked.</p>
+    </div>
+    <aside class="curve-side">
+      <label for="curve-input">Curve (paste this into the mod's <em>Cost curve</em> setting)</label>
+      <textarea id="curve-input" rows="3" spellcheck="false"></textarea>
+      <p id="curve-error" class="error-text" hidden></p>
+      <button class="button primary" id="copy-curve">Copy for mod settings</button>
+      <div class="fields">
+        <label>Infinite techs ×<input id="inf-input" type="number" min="0" step="any"></label>
+        <label>Research time ×<input id="time-input" type="number" min="0" step="any" value="1"></label>
+      </div>
+      <div id="stats" class="stats"></div>
+    </aside>
+  </section>
+
+  <nav class="tabs" role="tablist">
+    <button data-tab="tree" role="tab">Tech tree</button>
+    <button data-tab="techs" role="tab">All techs</button>
+    <button data-tab="sets" role="tab">By science packs</button>
+    <label class="spm">at <input id="spm-input" type="number" min="1" step="any"> SPM</label>
+  </nav>
+
+  <section id="view-tree" class="view">
+    <div class="tree-tools">
+      <input id="tree-search" list="tech-search-list" placeholder="Find a tech…" aria-label="Find a tech">
+      <datalist id="tech-search-list"></datalist>
+      <label>Colour by
+        <select id="tree-color">
+          <option value="cost">cost after</option>
+          <option value="multiplier">multiplier</option>
+          <option value="pack">newest science pack</option>
+        </select>
+      </label>
+      <span class="spacer"></span>
+      <button class="button" id="tree-out" aria-label="Zoom out">−</button>
+      <button class="button" id="tree-in" aria-label="Zoom in">+</button>
+      <button class="button" id="tree-fit">Fit</button>
+    </div>
+    <div class="tree-area">
+      <div id="tree" class="tree"></div>
+      <aside id="tree-panel" class="tree-panel"></aside>
+    </div>
+    <p class="legend muted"><i class="key anc"></i> needed to reach the selected tech <i class="key desc"></i> unlocked after it. Columns are prerequisite depth.</p>
+  </section>
+
+  <section id="view-techs" class="view" hidden>
+    <div class="tree-tools">
+      <input id="tech-filter" placeholder="Filter by name…" aria-label="Filter techs">
+      <span id="tech-count" class="muted"></span>
+    </div>
+    <div class="table-wrap"><table id="tech-table"><thead></thead><tbody></tbody></table></div>
+  </section>
+
+  <section id="view-sets" class="view" hidden>
+    <p class="muted">Research units per set of science packs, in the order the sets appear. Hours assume <span id="sets-spm"></span> SPM (science packs of each kind per minute).</p>
+    <div class="table-wrap">
+      <table id="sets-table">
+        <thead><tr><th>Science packs</th><th>Techs</th><th>Before</th><th>After</th><th>×</th><th>Hours</th><th>Hours so far</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer class="muted">
+  <a href="https://github.com/bits-orio/research-cost-shaper">Source on GitHub</a> ·
+  Inspired by RedRafe's <a href="https://mods.factorio.com/mod/technology-overload">Technology Overload</a>
+</footer>
+
+<dialog id="paste-dialog">
+  <form id="paste-form">
+    <h2>Paste export</h2>
+    <p class="muted">In game, type <code>/rcs-export</code> and copy the selected text. Or copy the contents of <code>rcs-export.txt</code>.</p>
+    <textarea id="paste-text" rows="8" spellcheck="false" placeholder="RCS1:…"></textarea>
+    <p id="paste-error" class="error-text" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" class="button" id="paste-cancel">Cancel</button>
+      <button type="submit" class="button primary">Load</button>
+    </div>
+  </form>
+</dialog>
 </body>
 </html>

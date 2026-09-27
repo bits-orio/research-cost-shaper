@@ -8,6 +8,8 @@
 # setting applies); this working tree replaces any installed copy of the mod.
 # Without one, runs vanilla + Space Age with the default curve.
 # Set RCS_KEEP_EXPORT=<path> to keep a copy of rcs-export.txt.
+# Set RCS_CURVE=<curve> to override the curve (replaces the setting's default;
+# a curve saved in mods-dir's mod-settings.dat still wins).
 # Nothing in mods-dir or your Factorio user data is modified.
 set -euo pipefail
 
@@ -41,6 +43,15 @@ fi
 rsync -a --exclude .git --exclude site --exclude tests --exclude tools "$REPO/" "$WORK/mods/$NAME/"
 sed -i -E "s/\"factorio_version\": \"[0-9.]+\"/\"factorio_version\": \"$VERSION\"/; s/\"base >= [0-9.]+\"/\"base >= $VERSION\"/" \
     "$WORK/mods/$NAME/info.json"
+if [[ -n "${RCS_CURVE:-}" ]]; then
+    python3 - "$WORK/mods/$NAME/settings.lua" "$RCS_CURVE" <<'PY'
+import re, sys
+path, value = sys.argv[1], sys.argv[2]
+text = open(path).read()
+text = re.sub(r'default_value = "[^"]*"', 'default_value = "' + value.replace('"', '') + '"', text, count=1)
+open(path, "w").write(text)
+PY
+fi
 python3 - "$WORK/mods/mod-list.json" "$NAME" <<'PY'
 import json, sys
 path, name = sys.argv[1], sys.argv[2]
