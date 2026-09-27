@@ -51,3 +51,32 @@ test("ancestors and pack sets", () => {
   assert.equal(sets[0].key, "automation-science-pack");
   assert.equal(sets[1].key, "automation-science-pack+logistic-science-pack");
 });
+
+test("formula techs get a numeric cost at their level; triggers are described", () => {
+  const exp = load("tests/fixtures/space-age-2.1-custom.txt");
+  const rows = M.predict(M.techsOf(exp), RcsCurve.parse(exp.curve)[0]);
+  const byName = new Map(rows.map((r) => [r.name, r]));
+  const dmg = byName.get("physical-projectile-damage-7");
+  assert.equal(dmg.level, 7);
+  assert.equal(dmg.levelCost, 1000); // 2^(7-7)*1000
+  assert.equal(dmg.now.levelCost, 12500); // x12.5 (inf in the fixture curve)
+  assert.equal(dmg.maxLevel, "infinite");
+  const steel = byName.get("tungsten-steel");
+  assert.equal(steel.kind, "trigger");
+  assert.match(M.describeTrigger(steel.trigger), /^(Craft|Mine|Build)/);
+  assert.equal(M.describeTrigger(null), "Unlocked by an in-game action, not science packs.");
+});
+
+test("formula evaluator", () => {
+  const F = require("../site/formula.js");
+  assert.equal(F.evaluate("2^(L-6)*1000", 8), 4000);
+  assert.equal(F.evaluate("1000*(L - 2)", 5), 3000);
+  assert.equal(F.evaluate("1.2^L*1000", 1), 1200);
+  assert.equal(F.evaluate("2^3^2", 1), 512); // right-associative
+  assert.equal(F.evaluate("-L^2", 3), -9);
+  assert.equal(F.evaluate("(2^(L-1)*1000)*10", 1), 10000);
+  assert.equal(F.evaluate("log2(L)", 4), null); // unsupported -> fall back to text
+  assert.equal(F.evaluate("2^", 1), null);
+  assert.equal(F.levelOf("physical-projectile-damage-7"), 7);
+  assert.equal(F.levelOf("research-productivity"), 1);
+});

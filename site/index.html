@@ -1,41 +1,81 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Research Cost Shaper</title>
 <meta name="description" content="Design a research cost curve for Factorio and preview every tech's new cost for your modpack.">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="dark light">
 <!-- The page has its own dark theme; stop Dark Reader from recolouring pack colours. -->
 <meta name="darkreader-lock">
-<script>try { const t = localStorage.getItem("rcs.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23e0782c'/%3E%3Cpath d='M12 5h8M13.5 5v8L7.2 23.6A2.6 2.6 0 0 0 9.5 27.5h13a2.6 2.6 0 0 0 2.3-3.9L18.5 13V5' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M9.1 23.1C12.5 23.2 16.3 21.9 20.4 18.4L23.7 23.9A1.5 1.5 0 0 1 22.4 26.1H9.6A1.5 1.5 0 0 1 8.3 23.9Z' fill='white'/%3E%3C/svg%3E">
+<!-- Dark is the default; a saved choice (light, dark, auto) wins. -->
+<script>try { const t = localStorage.getItem("rcs.theme") || "dark"; if (t === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; } catch {}</script>
 <link rel="stylesheet" href="style.css">
 <script src="curve.js"></script>
+<script src="formula.js"></script>
 <script src="model.js"></script>
 <script type="module" src="app.js"></script>
 </head>
 <body>
+<svg class="sprite" aria-hidden="true">
+  <defs>
+    <linearGradient id="brand-fill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f29a45"/><stop offset="1" stop-color="#c9531d"/></linearGradient>
+  </defs>
+  <symbol id="i-brand" viewBox="0 0 32 32">
+    <rect width="32" height="32" rx="7" fill="url(#brand-fill)" stroke="none"/>
+    <path d="M12 5h8M13.5 5v8L7.2 23.6A2.6 2.6 0 0 0 9.5 27.5h13a2.6 2.6 0 0 0 2.3-3.9L18.5 13V5" fill="none" stroke="#fff" stroke-width="2.2"/>
+    <path d="M9.1 23.1C12.5 23.2 16.3 21.9 20.4 18.4L23.7 23.9A1.5 1.5 0 0 1 22.4 26.1H9.6A1.5 1.5 0 0 1 8.3 23.9Z" fill="#fff" stroke="none"/>
+  </symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></symbol>
+  <symbol id="i-paste" viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/></symbol>
+  <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6L4.6 18.4A1.8 1.8 0 0 0 6.2 21h11.6a1.8 1.8 0 0 0 1.6-2.6L14 9V3M7 15h10"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4zM22 9l-6 6M16 9l6 6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></symbol>
+</svg>
+
 <header class="top">
   <div class="brand">
-    <h1>Research Cost Shaper</h1>
-    <p class="muted">Curve designer for the Factorio mod. Everything runs in your browser; nothing leaves it unless you click Share.</p>
+    <svg class="brand-mark" aria-hidden="true"><use href="#i-brand"/></svg>
+    <div>
+      <h1>Research Cost Shaper</h1>
+      <p class="muted">Curve designer for the Factorio mod. Everything runs in your browser; nothing leaves it unless you click Share.</p>
+    </div>
   </div>
   <div class="load">
-    <label class="button primary">Import rcs-export.txt<input type="file" class="file-input" accept=".txt,text/plain" hidden></label>
-    <button class="button paste-open">Paste export</button>
-    <button class="button" id="share-open">Share</button>
-    <select id="sample-select" class="button" aria-label="Load a sample">
-      <option value="">Samples…</option>
-      <option value="space-age-2.0">Space Age (2.0)</option>
-      <option value="vanilla-2.0">Vanilla (2.0)</option>
-    </select>
-    <button class="button quiet" id="theme-toggle" title="Switch between automatic, light and dark">Theme: auto</button>
-    <button class="button quiet" id="sound-toggle" title="Short, quiet sounds when the curve changes">Sound: on</button>
+    <label class="button primary"><svg class="icon"><use href="#i-upload"/></svg>Import rcs-export.txt<input type="file" class="file-input" accept=".txt,text/plain" hidden></label>
+    <button class="button paste-open"><svg class="icon"><use href="#i-paste"/></svg>Paste export</button>
+    <label class="button select-button"><svg class="icon"><use href="#i-flask"/></svg>
+      <select id="sample-select" aria-label="Load a sample">
+        <option value="">Samples</option>
+        <option value="space-age-2.0">Space Age (2.0)</option>
+        <option value="vanilla-2.0">Vanilla (2.0)</option>
+      </select>
+    </label>
+    <span class="load-sep" aria-hidden="true"></span>
+    <div class="recent-wrap">
+      <button class="button" id="recent-open" aria-expanded="false"><svg class="icon"><use href="#i-clock"/></svg>Recent</button>
+      <div id="recent-panel" class="recent-panel" hidden></div>
+    </div>
+    <button class="button save-open"><svg class="icon"><use href="#i-save"/></svg>Save</button>
+    <button class="button share" id="share-open"><svg class="icon"><use href="#i-share"/></svg>Share</button>
+    <button class="button quiet icon-only" id="theme-toggle" title="Theme"></button>
+    <button class="button quiet icon-only" id="sound-toggle" title="Sound"></button>
   </div>
 </header>
 
 <p id="load-error" class="banner error" hidden></p>
 <section id="sample-banner" class="sample-banner" hidden>
+  <button class="sample-close" id="sample-dismiss-x" aria-label="Dismiss"><svg class="icon"><use href="#i-x"/></svg></button>
   <div class="sample-text">
     <p class="sample-kicker">Sample data</p>
     <h2>This is not your modpack</h2>
@@ -48,15 +88,16 @@
     </ol>
   </div>
   <div class="sample-actions">
-    <label class="button primary big">Import rcs-export.txt<input type="file" class="file-input" accept=".txt,text/plain" hidden></label>
-    <button class="button big paste-open">Paste export</button>
+    <label class="button primary big"><svg class="icon"><use href="#i-upload"/></svg>Import rcs-export.txt<input type="file" class="file-input" accept=".txt,text/plain" hidden></label>
+    <button class="button big paste-open"><svg class="icon"><use href="#i-paste"/></svg>Paste export</button>
+    <button class="button big ghost" id="sample-dismiss">Just exploring</button>
   </div>
 </section>
 <section id="shared-hero" class="hero" hidden>
   <p class="hero-kicker">Shared run</p>
   <h2 id="hero-title"></h2>
   <p id="hero-meta" class="hero-meta"></p>
-  <p class="hero-note">Someone's modpack and research curve. Changes you make stay on your screen until you share them again.</p>
+  <p class="hero-note">Someone's modpack and research curve. Changes you make stay on your screen until you save or share them.</p>
 </section>
 <div id="source" class="source"></div>
 
@@ -71,7 +112,7 @@
       <label for="curve-input">Curve (paste this into the mod's <em>Cost curve</em> setting)</label>
       <textarea id="curve-input" rows="3" spellcheck="false"></textarea>
       <p id="curve-error" class="error-text" hidden></p>
-      <button class="button primary" id="copy-curve">Copy for mod settings</button>
+      <button class="button primary" id="copy-curve"><svg class="icon"><use href="#i-copy"/></svg><span>Copy for mod settings</span></button>
       <div class="fields">
         <label>Infinite techs ×<input id="inf-input" type="number" min="0" step="any"></label>
         <label>Research time ×<input id="time-input" type="number" min="0" step="any" value="1"></label>
@@ -135,17 +176,19 @@
 
 <dialog id="share-dialog">
   <form id="share-form">
-    <h2>Share this run</h2>
-    <p class="muted">Creates a short link to this modpack and curve, for Discord or anywhere else. Anyone with the link can see them.</p>
-    <p id="share-sample-note" class="warn" hidden>This is sample data. Import your own rcs-export.txt first if you want to share your modpack.</p>
-    <label class="field">Title (optional)<input id="share-title" maxlength="80" placeholder="e.g. MTS week 39"></label>
+    <h2>Save or share this run</h2>
+    <p class="muted"><strong>Save</strong> keeps this modpack and curve in this browser, under Recent. <strong>Share</strong> also creates a short link anyone can open.</p>
+    <p id="share-sample-note" class="warn" hidden>This is sample data. Import your own rcs-export.txt first if you want to save or share your modpack.</p>
+    <label class="field">Title<input id="share-title" maxlength="80" placeholder="e.g. MTS week 39"></label>
     <div id="share-result" hidden>
       <label class="field">Link<input id="share-url" readonly></label>
     </div>
+    <p id="share-status" class="ok" hidden></p>
     <p id="share-error" class="error-text" hidden></p>
     <div class="dialog-actions">
       <button type="button" class="button" id="share-cancel">Close</button>
-      <button type="submit" class="button primary" id="share-submit">Create link</button>
+      <button type="button" class="button" id="save-submit"><svg class="icon"><use href="#i-save"/></svg>Save</button>
+      <button type="submit" class="button share" id="share-submit"><svg class="icon"><use href="#i-share"/></svg><span>Create share link</span></button>
     </div>
   </form>
 </dialog>

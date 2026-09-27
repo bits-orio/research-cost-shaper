@@ -35,7 +35,7 @@ end
 --- Snapshot of every technology, before any change.
 ---@param raw table data.raw.technology
 ---@return table<string, table> name -> {kind, exempt, prerequisites, packs,
----   ingredients, count, formula, time}. kind is "count", "formula" or
+---   ingredients, count, formula, time, trigger, max_level}. kind is "count", "formula" or
 ---   "trigger"; packs is what the tech alone costs in science packs (0 for
 ---   formula and trigger techs).
 function techs.snapshot(raw)
@@ -45,6 +45,10 @@ function techs.snapshot(raw)
         local entry = {
             prerequisites = copy_list(proto.prerequisites),
             exempt = proto.ignore_tech_cost_multiplier == true,
+            -- What unlocks a trigger tech (e.g. {type = "craft-item", item = ...}),
+            -- and how far a levelled tech goes; both only described, never changed.
+            trigger = proto.research_trigger,
+            max_level = proto.max_level,
             packs = 0,
         }
         if not unit then

@@ -149,7 +149,7 @@ class ShapeTest(unittest.TestCase):
             report = require("lib.report")
             function fake_raw()
                 return {
-                    ["t-start"] = { name = "t-start" },
+                    ["t-start"] = { name = "t-start", research_trigger = { type = "craft-item", item = "iron-plate", count = 10 } },
                     ["a"] = { name = "a", prerequisites = { "t-start" },
                         unit = { count = 10, time = 5, ingredients = { { "red", 1 } } } },
                     ["b"] = { name = "b", prerequisites = { "a" },
@@ -233,6 +233,8 @@ class ShapeTest(unittest.TestCase):
         self.assertEqual((out.techs["c"].count, out.techs["c"].new_count), (900, 45000))
         self.assertEqual(out.techs["inf"].new_formula, "(2^L*1000)*50")
         self.assertEqual(out.techs["free"].skipped, "exempt")
+        self.assertEqual((out.techs["t-start"].trigger.type, out.techs["t-start"].trigger.item), ("craft-item", "iron-plate"))
+        self.assertEqual(out.techs["inf"].max_level, "infinite")
 
 
 if __name__ == "__main__":

@@ -85,7 +85,7 @@ export function layout(rows) {
   return { pos, children, columns: cols.length };
 }
 
-export function createTree(container, { packColor, fmt, onSelect }) {
+export function createTree(container, { packColor, fmt, onSelect, describeTrigger }) {
   const svg = el("svg", { class: "tree-svg" }, container);
   const view = el("g", {}, svg);
   const edgeLayer = el("g", { class: "edges" }, view);
@@ -168,17 +168,23 @@ export function createTree(container, { packColor, fmt, onSelect }) {
   const newestPack = (r) => r.ingredients.map((i) => i[0]).sort((a, b) => r.rank.get(b) - r.rank.get(a))[0];
 
   function paint(rows) {
-    const valueOf = (r) => (r.skipped || r.kind === "trigger" ? null : colorMode === "multiplier" ? r.now.multiplier : r.kind === "count" ? r.now.count : null);
+    const valueOf = (r) => (r.skipped || r.kind === "trigger" ? null
+      : colorMode === "multiplier" ? r.now.multiplier
+      : r.kind === "count" ? r.now.count : r.now.levelCost);
     const scale = heat(rows.map(valueOf));
     const packs = new Set();
     for (const r of rows) {
       const n = current.nodes.get(r.name);
+      const trigger = r.kind === "trigger" ? describeTrigger(r.trigger) : "";
       n.cost.textContent =
-        r.kind === "trigger" ? "trigger (no packs)"
-        : r.skipped ? `${fmt(r.count)} · unchanged`
-        : r.kind === "formula" ? `infinite · ×${fmt(r.now.multiplier, 2)}`
+        r.kind === "trigger" ? short(trigger, 30)
+        : r.skipped ? `${fmt(r.count ?? r.levelCost)} · unchanged`
+        : r.kind === "formula" && r.levelCost != null ? `lvl ${r.level}: ${fmt(r.levelCost)} → ${fmt(r.now.levelCost)}  ×${fmt(r.now.multiplier, 2)}`
+        : r.kind === "formula" ? `formula · ×${fmt(r.now.multiplier, 2)}`
         : `${fmt(r.count)} → ${fmt(r.now.count)}  ×${fmt(r.now.multiplier, 2)}`;
-      n.title.textContent = `${r.name}\nx ${r.x.toFixed(3)} · ${r.kind === "formula" ? r.now.formula : r.kind === "trigger" ? "trigger" : `${fmt(r.count)} → ${fmt(r.now.count)} units`}`;
+      n.title.textContent = `${r.name}\n${r.kind === "trigger" ? `No science cost. ${trigger}`
+        : r.kind === "formula" ? `Level ${r.level}: ${fmt(r.levelCost)} → ${fmt(r.now.levelCost)} units (${r.now.formula})`
+        : `${fmt(r.count)} → ${fmt(r.now.count)} units`}`;
       n.packs.textContent = "";
       r.ingredients.forEach(([pack], i) => el("rect", { x: NODE_W - 10 - i * 8, y: 6, width: 6, height: 6, rx: 1, fill: packColor(pack) }, n.packs));
       let fill = "";

@@ -3,9 +3,9 @@
 // spec/curve-format.md); tests/model.test.js checks it against real exports.
 
 (function (root, factory) {
-  if (typeof module === "object" && module.exports) module.exports = factory(require("./curve.js"));
-  else root.RcsModel = factory(root.RcsCurve);
-})(this, function (RcsCurve) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("./curve.js"), require("./formula.js"));
+  else root.RcsModel = factory(root.RcsCurve, root.RcsFormula);
+})(this, function (RcsCurve, RcsFormula) {
   const PREFIX = "RCS1:";
   const MAX_COUNT = 2 ** 53;
 
@@ -36,6 +36,9 @@
       time: t.time ?? null,
       ingredients: list(t.ingredients),
       prerequisites: list(t.prerequisites),
+      trigger: t.trigger || null,
+      maxLevel: t.max_level ?? null,
+      level: RcsFormula.levelOf(name),
       game: { multiplier: t.multiplier, count: t.new_count ?? t.count ?? null, formula: t.new_formula ?? t.formula ?? null, time: t.new_time ?? t.time ?? null },
     }));
   }
@@ -56,8 +59,34 @@
         }
         if (spec.time !== 1 && t.time != null) p.time = t.time * spec.time;
       }
+      // Formula techs: the cost of the level this tech starts at, as a number.
+      if (t.kind === "formula") {
+        const level = t.level;
+        const before = RcsFormula.evaluate(t.formula, level);
+        const after = RcsFormula.evaluate(p.formula, level);
+        t.levelCost = before == null ? null : Math.round(before);
+        p.levelCost = after == null ? null : Math.round(after);
+      }
       return { ...t, now: p };
     });
+  }
+
+  /** A trigger tech's unlock condition in words, e.g. "Craft a big-mining-drill". */
+  function describeTrigger(tr) {
+    if (!tr) return "Unlocked by an in-game action, not science packs.";
+    const name = (v) => (v && typeof v === "object" ? v.name : v) || "?";
+    const n = tr.count > 1 ? `${tr.count} × ` : "";
+    switch (tr.type) {
+      case "craft-item": return `Craft ${n}${name(tr.item)}`;
+      case "craft-fluid": return `Produce ${tr.amount ? `${tr.amount} ` : ""}${name(tr.fluid)}`;
+      case "mine-entity": return `Mine ${name(tr.entity)}`;
+      case "build-entity": return `Build ${name(tr.entity)}`;
+      case "capture-spawner": return tr.entity ? `Capture ${name(tr.entity)}` : "Capture a spawner";
+      case "send-item-to-orbit": return `Launch ${name(tr.item)} into orbit`;
+      case "create-space-platform": return "Create a space platform";
+      case "scripted": return tr.trigger_description ? "Scripted: " + tr.trigger_description : "A scripted event";
+      default: return tr.type ? `Trigger: ${tr.type}` : "Unlocked by an in-game action.";
+    }
   }
 
   /** Techs where the prediction disagrees with what the game applied. */
@@ -121,5 +150,5 @@
     return seen;
   }
 
-  return { PREFIX, roundCount, formulaNumber, techsOf, predict, mismatches, sameSpec, packRanks, sortPacks, packSets, ancestors, descendants };
+  return { PREFIX, describeTrigger, roundCount, formulaNumber, techsOf, predict, mismatches, sameSpec, packRanks, sortPacks, packSets, ancestors, descendants };
 });

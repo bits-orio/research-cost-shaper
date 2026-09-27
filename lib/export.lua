@@ -32,6 +32,8 @@ function export.build(snapshot, plan, curve_string, active_mods)
             new_time = p.new_time,
             ingredients = t.ingredients,
             prerequisites = t.prerequisites,
+            trigger = t.trigger,
+            max_level = t.max_level,
         }
     end
     local mod_list = {}

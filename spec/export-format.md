@@ -28,13 +28,20 @@ stripping `RCS1:`, base64-decoding, and inflating (zlib).
       "new_formula": "(1.2^L*1000)*10",
       "time": 60, "new_time": 120,            // new_time absent when time=1
       "ingredients": [["automation-science-pack", 1], ...],
-      "prerequisites": ["concrete", ...]      // encodes as {} when empty
+      "prerequisites": ["concrete", ...],     // encodes as {} when empty
+      "trigger": {"type": "craft-item", "item": "tungsten-plate"},  // trigger techs: research_trigger as-is
+      "max_level": "infinite"                 // levelled techs: number or "infinite"
     }
   }
 }
 ```
 
-Fields absent from a tech mean "not applicable" or "unchanged". The page
+Fields absent from a tech mean "not applicable" or "unchanged". `trigger` and
+`max_level` were added after the first release; older exports lack them.
+
+A levelled tech's level is the number at the end of its name
+(`physical-projectile-damage-7` is level 7), as in the game; `count_formula`
+is evaluated with `L` set to that level. The page
 recomputes new costs from `x` and its own curve, and compares against
 `new_count` to catch any disagreement with the game (±1 allowed for
 rounding).
