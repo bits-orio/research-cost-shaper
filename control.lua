@@ -6,8 +6,20 @@ local game_check = require("scripts.game_check")
 script.on_init(game_check.run)
 script.on_configuration_changed(game_check.run)
 
+-- Admins hear about the page once per save, then about any cost problems.
+local function introduce(player)
+    storage.introduced = storage.introduced or {}
+    if not player.admin or storage.introduced[player.index] then
+        return
+    end
+    storage.introduced[player.index] = true
+    player.print({ "rcs.intro", prototypes.mod_data["research-cost-shaper"].data.page_url })
+end
+
 script.on_event(defines.events.on_player_joined_game, function(event)
-    game_check.warn_admin(game.get_player(event.player_index))
+    local player = game.get_player(event.player_index)
+    introduce(player)
+    game_check.warn_admin(player)
 end)
 
 commands.add_command("rcs-export", { "rcs.command-help" }, function(command)
