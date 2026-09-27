@@ -1,6 +1,7 @@
 import { createChart } from "./chart.js";
 import { createTree } from "./tree.js";
 
+const SHARE_API = "https://rcs-share.bits-orio.workers.dev";
 const Curve = window.RcsCurve;
 const Model = window.RcsModel;
 const $ = (sel) => document.querySelector(sel);
@@ -85,9 +86,13 @@ async function decode(text) {
 
 // ---------------------------------------------------------------- loading
 
-async function loadText(text, source, { remember = true } = {}) {
+async function loadText(text, source, { remember = true, shared = null, curve = null } = {}) {
   const exp = await decode(text);
   state.exp = exp;
+  state.exportText = text.trim();
+  state.shared = shared;
+  // Loading anything else leaves the shared run behind, so drop ?s= from the address.
+  if (!shared && new URLSearchParams(location.search).has("s")) history.replaceState(null, "", location.pathname + location.hash);
   state.techs = Model.techsOf(exp);
   state.rank = Model.packRanks(state.techs);
   for (const t of state.techs) t.rank = state.rank;
@@ -98,8 +103,21 @@ async function loadText(text, source, { remember = true } = {}) {
   state.source = source;
   if (remember) { store.set("export", text); store.set("source", source); }
   renderSource();
-  const fromHash = curveFromHash();
-  setSpec(fromHash || Curve.parse(exp.curve)[0], { writeInput: true });
+  const fromLink = curve ? Curve.parse(curve)[0] : null;
+  setSpec(curveFromHash() || fromLink || Curve.parse(exp.curve)[0], { writeInput: true });
+}
+
+/** Loads a run shared through the share service (?s=<id>). */
+async function loadShare(id) {
+  let res;
+  try { res = await fetch(`${SHARE_API}/api/share/${encodeURIComponent(id)}`); }
+  catch { throw new Error("Couldn't reach the share service. Check your connection and reload."); }
+  if (res.status === 404) throw new Error("That share link doesn't exist. Check that you copied all of it.");
+  if (!res.ok) throw new Error("The share service had a problem. Try again in a moment.");
+  const rec = await res.json();
+  await loadText(rec.export, rec.title ? `Shared: ${rec.title}` : "Shared run", {
+    remember: false, shared: { id, title: rec.title, created: rec.created }, curve: rec.curve,
+  });
 }
 
 async function loadSample(name, label) {
@@ -150,6 +168,11 @@ function renderSource() {
   const sample = state.source.startsWith("Sample");
   $("#sample-banner").hidden = !sample;
   $("#sample-name").textContent = sample ? `the ${state.source.replace(/^Sample: /, "")} sample` : "";
+  $("#shared-banner").hidden = !state.shared;
+  if (state.shared) {
+    const when = state.shared.created ? new Date(state.shared.created).toLocaleDateString(undefined, { dateStyle: "medium" }) : "";
+    $("#shared-text").textContent = `${state.shared.title ? `"${state.shared.title}"` : "A run"}${when ? `, shared ${when}` : ""}.`;
+  }
   const mods = exp.mods.filter(([n]) => n !== "research-cost-shaper");
   $("#source").innerHTML =
     (sample ? `<span class="sample-pill">Sample data</span> ` : "") +
@@ -389,12 +412,61 @@ $("#sample-select").addEventListener("change", async (e) => {
   e.target.value = "";
 });
 
-// Start: last export, else the Space Age sample.
+// Sharing: create a short link for the loaded export and the current curve.
+let lastShare = null; // { key, url }
+function shareKey() { return `${state.exportText.length}:${serialize(state.spec)}:${$("#share-title").value.trim()}`; }
+function resetShareResult() {
+  $("#share-result").hidden = true;
+  $("#share-error").hidden = true;
+  $("#share-submit").textContent = "Create link";
+}
+$("#share-open").addEventListener("click", () => {
+  if (!lastShare || lastShare.key !== shareKey()) resetShareResult();
+  $("#share-sample-note").hidden = !state.source.startsWith("Sample");
+  $("#share-dialog").showModal();
+});
+$("#share-cancel").addEventListener("click", () => $("#share-dialog").close());
+$("#share-title").addEventListener("input", resetShareResult);
+$("#share-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (lastShare && lastShare.key === shareKey() && !$("#share-result").hidden) {
+    try { await navigator.clipboard.writeText(lastShare.url); $("#share-submit").textContent = "Copied"; }
+    catch { $("#share-url").select(); $("#share-submit").textContent = "Press Ctrl+C"; }
+    return;
+  }
+  $("#share-submit").disabled = true;
+  $("#share-submit").textContent = "Creating…";
+  $("#share-error").hidden = true;
+  try {
+    const res = await fetch(`${SHARE_API}/api/share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ export: state.exportText, curve: serialize(state.spec), title: $("#share-title").value.trim() || undefined }),
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(out.error || `The share service said no (${res.status}).`);
+    lastShare = { key: shareKey(), url: out.url };
+    $("#share-url").value = out.url;
+    $("#share-result").hidden = false;
+    $("#share-url").select();
+    $("#share-submit").textContent = "Copy link";
+  } catch (err) {
+    $("#share-error").textContent = err instanceof TypeError ? "Couldn't reach the share service. Check your connection." : err.message;
+    $("#share-error").hidden = false;
+    $("#share-submit").textContent = "Create link";
+  } finally {
+    $("#share-submit").disabled = false;
+  }
+});
+
+// Start: a shared link, else the last export, else the Space Age sample.
 showTab(store.get("tab") || "tree");
 (async () => {
+  const shareId = new URLSearchParams(location.search).get("s");
   const saved = store.get("export");
   try {
-    if (saved) await loadText(saved, store.get("source") || "Your export", { remember: false });
+    if (shareId) await loadShare(shareId);
+    else if (saved) await loadText(saved, store.get("source") || "Your export", { remember: false });
     else await loadSample("space-age-2.0", "Space Age (2.0)");
   } catch (err) {
     showError(err.message);

@@ -183,10 +183,19 @@ async function handleShare(request, env) {
   );
 }
 
+// Reads are public, so every answer (404s included) must be readable
+// cross-origin; otherwise the page can't tell "missing" from "unreachable".
+function publicNotFound() {
+  return new Response(JSON.stringify({ error: "Not found." }), {
+    status: 404,
+    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+  });
+}
+
 async function handleGetShare(id, env) {
-  if (!ID_RE.test(id)) return json({ error: "Not found." }, 404, null, env);
+  if (!ID_RE.test(id)) return publicNotFound();
   const raw = await env.SHARES.get(`s:${id}`);
-  if (!raw) return json({ error: "Not found." }, 404, null, env);
+  if (!raw) return publicNotFound();
   return new Response(raw, {
     status: 200,
     headers: {

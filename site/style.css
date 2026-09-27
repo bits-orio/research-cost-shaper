@@ -206,4 +206,8 @@ footer { max-width: 1400px; margin: 24px auto 0; font-size: 12.5px; }
 dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); width: min(640px, calc(100vw - 32px)); padding: 18px; }
 dialog::backdrop { background: rgb(0 0 0 / 0.4); }
 dialog h2 { margin: 0 0 6px; font-size: 1.1rem; }
+dialog .field { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; font-weight: 600; }
+dialog .field input { font-weight: 400; width: 100%; }
+#share-url { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+.banner.shared { border: 2px solid var(--desc); background: color-mix(in oklab, var(--desc) 10%, var(--surface)); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }

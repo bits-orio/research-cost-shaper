@@ -159,6 +159,15 @@ test("GET with a badly-formed id returns 404", async () => {
   assert.equal(res.status, 404);
 });
 
+test("GET for an unknown id is a 404 the page can read cross-origin", async () => {
+  const env = makeEnv();
+  for (const id of ["aaaaaaaaaa", "not-an-id!!"]) {
+    const res = await worker.fetch(new Request(`https://x/api/share/${id}`), env);
+    assert.equal(res.status, 404);
+    assert.equal(res.headers.get("Access-Control-Allow-Origin"), "*");
+  }
+});
+
 test("GET /s/<id> for an unknown id shows a 404 page", async () => {
   const env = makeEnv();
   const res = await worker.fetch(new Request("https://x/s/aaaaaaaaaa"), env);

@@ -14,11 +14,12 @@
 <header class="top">
   <div class="brand">
     <h1>Research Cost Shaper</h1>
-    <p class="muted">Curve designer for the Factorio mod. Everything runs in your browser; nothing is uploaded.</p>
+    <p class="muted">Curve designer for the Factorio mod. Everything runs in your browser; nothing leaves it unless you click Share.</p>
   </div>
   <div class="load">
     <label class="button primary">Import rcs-export.txt<input type="file" class="file-input" accept=".txt,text/plain" hidden></label>
     <button class="button paste-open">Paste export</button>
+    <button class="button" id="share-open">Share</button>
     <select id="sample-select" class="button" aria-label="Load a sample">
       <option value="">Samples…</option>
       <option value="space-age-2.0">Space Age (2.0)</option>
@@ -45,6 +46,10 @@
     <button class="button big paste-open">Paste export</button>
   </div>
 </section>
+<p id="shared-banner" class="banner shared" hidden>
+  <strong>Shared run.</strong> <span id="shared-text"></span>
+  This is someone's modpack and curve. Your changes stay on your screen until you share them again.
+</p>
 <div id="source" class="source"></div>
 
 <main>
@@ -120,6 +125,23 @@
   <a href="https://github.com/bits-orio/research-cost-shaper">Source on GitHub</a> ·
   Inspired by RedRafe's <a href="https://mods.factorio.com/mod/technology-overload">Technology Overload</a>
 </footer>
+
+<dialog id="share-dialog">
+  <form id="share-form">
+    <h2>Share this run</h2>
+    <p class="muted">Creates a short link to this modpack and curve, for Discord or anywhere else. Anyone with the link can see them.</p>
+    <p id="share-sample-note" class="warn" hidden>This is sample data. Import your own rcs-export.txt first if you want to share your modpack.</p>
+    <label class="field">Title (optional)<input id="share-title" maxlength="80" placeholder="e.g. MTS week 39"></label>
+    <div id="share-result" hidden>
+      <label class="field">Link<input id="share-url" readonly></label>
+    </div>
+    <p id="share-error" class="error-text" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" class="button" id="share-cancel">Close</button>
+      <button type="submit" class="button primary" id="share-submit">Create link</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog id="paste-dialog">
   <form id="paste-form">
