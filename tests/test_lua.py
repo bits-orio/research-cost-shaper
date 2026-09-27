@@ -310,5 +310,60 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(self.lua.eval('check.names({"a","b","c","d"}, 2)'), "a, b and 2 more")
 
 
+
+class ExportWindowTest(unittest.TestCase):
+    """scripts/export_window against a stand-in for Factorio's GUI API."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.lua = lua_runtime()
+        cls.lua.execute("""
+            -- Minimal fake of LuaGuiElement: children by name, style table, focus/selection log.
+            events = {}
+            local function element(props, parent)
+                local e = { children = {}, style = {}, valid = true, type = props.type, name = props.name,
+                            caption = props.caption, text = props.text }
+                function e.add(spec)
+                    local child = element(spec, e)
+                    e.children[#e.children + 1] = child
+                    if spec.name then e[spec.name] = child end
+                    return child
+                end
+                function e.focus() events[#events + 1] = "focus:" .. tostring(e.name) end
+                function e.select_all() events[#events + 1] = "select:" .. tostring(e.name) end
+                function e.destroy() e.valid = false; if parent and e.name then parent[e.name] = nil end end
+                return e
+            end
+            screen = element({ type = "screen" })
+            player = { index = 1, gui = { screen = screen } }
+            game = { get_player = function() return player end }
+            storage = { check = { clean = true } }
+            prototypes = { mod_data = { ["research-cost-shaper"] = { data = { export = "RCS1:abc", page_url = "https://example.test/" } } } }
+            window = require("scripts.export_window")
+        """)
+
+    def test_opens_with_both_fields_and_select_buttons(self):
+        L = self.lua
+        L.execute('events = {}; window.open(player, { { "rcs.check-ok", 3 } })')
+        frame = L.eval('screen.rcs_export_window')
+        self.assertEqual(frame.rcs_url_row.rcs_url.text, "https://example.test/")
+        self.assertEqual(frame.rcs_export_row.rcs_export.text, "RCS1:abc")
+        self.assertIsNotNone(frame.rcs_url_row.rcs_select_url)
+        self.assertIsNotNone(frame.rcs_export_row.rcs_select_export)
+        self.assertEqual(list(L.eval("events").values()), ["focus:rcs_export", "select:rcs_export"])
+
+    def test_select_buttons_focus_and_select_their_field(self):
+        L = self.lua
+        L.execute("window.open(player, {})")
+        for button, field in (("rcs_select_url", "rcs_url"), ("rcs_select_export", "rcs_export")):
+            L.execute(f'events = {{}}; window.on_click({{ player_index = 1, element = {{ valid = true, name = "{button}" }} }})')
+            self.assertEqual(list(L.eval("events").values()), [f"focus:{field}", f"select:{field}"])
+
+    def test_close_button_destroys_the_window(self):
+        L = self.lua
+        L.execute('window.open(player, {}); window.on_click({ player_index = 1, element = { valid = true, name = "rcs_export_close" } })')
+        self.assertIsNone(L.eval("screen.rcs_export_window"))
+
+
 if __name__ == "__main__":
     unittest.main()
