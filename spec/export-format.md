@@ -1,7 +1,7 @@
 # Export format, v1
 
 What the mod hands to the companion page. Written at every launch to
-`script-output/research-cost-shaper/export.txt`, and shown in game by
+`script-output/research-cost-shaper/rcs-export.txt`, and shown in game by
 `/rcs-export`. Overwritten each launch: it always describes the modpack that
 is loaded now.
 

@@ -7,7 +7,7 @@
 # mods-dir, uses its mods, mod-list.json and mod-settings.dat (so your curve
 # setting applies); this working tree replaces any installed copy of the mod.
 # Without one, runs vanilla + Space Age with the default curve.
-# Set RCS_KEEP_EXPORT=<path> to keep a copy of export.txt.
+# Set RCS_KEEP_EXPORT=<path> to keep a copy of rcs-export.txt.
 # Nothing in mods-dir or your Factorio user data is modified.
 set -euo pipefail
 
@@ -57,10 +57,10 @@ if ! "$GAME/bin/x64/factorio" --config "$WORK/config.ini" --mod-directory "$WORK
 fi
 
 OUT="$WORK/write/script-output/$NAME"
-cat "$OUT/report.txt"
+cat "$OUT/rcs-report.txt"
 echo
-echo "Export: $(wc -c < "$OUT/export.txt") characters"
+echo "Export: $(wc -c < "$OUT/rcs-export.txt") characters"
 if [[ -n "${RCS_KEEP_EXPORT:-}" ]]; then
-    cp "$OUT/export.txt" "$RCS_KEEP_EXPORT"
+    cp "$OUT/rcs-export.txt" "$RCS_KEEP_EXPORT"
     echo "Export copied to $RCS_KEEP_EXPORT"
 fi

@@ -8,7 +8,7 @@ commands.add_command("rcs-export", { "rcs.command-help" }, function(command)
     end
     -- Server console: the same export is already on disk.
     local length = #prototypes.mod_data["research-cost-shaper"].data.export
-    rcon.print("Research Cost Shaper export (" .. length .. " characters): script-output/research-cost-shaper/export.txt")
+    rcon.print("Research Cost Shaper export (" .. length .. " characters): script-output/research-cost-shaper/rcs-export.txt")
 end)
 
 script.on_event(defines.events.on_gui_click, export_window.on_click)

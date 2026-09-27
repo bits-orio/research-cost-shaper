@@ -27,8 +27,8 @@ techs.apply(data.raw.technology, plan)
 -- modpack loaded right now, and a stale export would mislead the page.
 local export_string = export.PREFIX
     .. helpers.encode_string(helpers.table_to_json(export.build(snapshot, plan, curve_string, mods)))
-helpers.write_file(OUTPUT_DIR .. "export.txt", export_string)
-helpers.write_file(OUTPUT_DIR .. "report.txt", report.build(snapshot, plan, curve_string) .. "\n")
+helpers.write_file(OUTPUT_DIR .. "rcs-export.txt", export_string)
+helpers.write_file(OUTPUT_DIR .. "rcs-report.txt", report.build(snapshot, plan, curve_string) .. "\n")
 log(
     "Research Cost Shaper: cost report and page export written to script-output/"
         .. OUTPUT_DIR
