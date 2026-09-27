@@ -64,6 +64,14 @@ const store = {
   set(k, v) { try { localStorage.setItem(`rcs.${k}`, v); } catch { /* private mode etc. */ } },
 };
 
+// The export you're working on survives a reload of this tab, but a new
+// visit starts from scratch; runs you want back live under Recent.
+const working = {
+  get(k) { try { return sessionStorage.getItem(`rcs.${k}`); } catch { return null; } },
+  set(k, v) { try { sessionStorage.setItem(`rcs.${k}`, v); } catch { /* private mode etc. */ } },
+};
+try { localStorage.removeItem("rcs.export"); localStorage.removeItem("rcs.source"); } catch { /* older versions kept these */ }
+
 // ---------------------------------------------------------------- state
 
 const state = {
@@ -117,7 +125,7 @@ async function loadText(text, source, { remember = true, shared = null, curve = 
   for (const t of state.techs) for (const p of t.prerequisites) (state.children.get(p) || state.children.set(p, []).get(p)).push(t.name);
   state.key = `${source}:${text.length}:${Date.now()}`;
   state.source = source;
-  if (remember) { store.set("export", text); store.set("source", source); }
+  if (remember) { working.set("export", text); working.set("source", source); }
   renderSource();
   const fromRun = curve ? Curve.parse(curve)[0] : null;
   setSpec((preferHash && curveFromHash()) || fromRun || current || curveFromHash() || Curve.parse(exp.curve)[0], { writeInput: true });
@@ -698,14 +706,14 @@ $("#recent-panel").addEventListener("click", async (e) => {
   }
 });
 
-// Start: a shared link, else the last export, else the Space Age sample.
+// Start: a shared link, else (on a reload) this tab's export, else the sample.
 showTab(store.get("tab") || "tree");
 (async () => {
   const shareId = new URLSearchParams(location.search).get("s");
-  const saved = store.get("export");
+  const current = working.get("export");
   try {
     if (shareId) await loadShare(shareId, { preferHash: true });
-    else if (saved) await loadText(saved, store.get("source") || "Your export", { remember: false });
+    else if (current) await loadText(current, working.get("source") || "Your export", { remember: false, preferHash: true });
     else await loadSample("space-age-2.0", "Space Age (2.0)");
   } catch (err) {
     showError(err.message);
