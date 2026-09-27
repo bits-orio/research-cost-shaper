@@ -2,6 +2,9 @@ local curve = require("lib.curve")
 local techs = require("lib.techs")
 local shape = require("lib.shape")
 local report = require("lib.report")
+local export = require("lib.export")
+
+local OUTPUT_DIR = "research-cost-shaper/"
 
 local curve_string = settings.startup["rcs-curve"].value
 local spec, err = curve.parse(curve_string)
@@ -19,33 +22,26 @@ local snapshot = techs.snapshot(data.raw.technology)
 local plan = shape.plan(snapshot, spec)
 techs.apply(data.raw.technology, plan)
 
-log("\n" .. report.build(snapshot, plan, curve_string))
+-- Written on every launch, before the main menu, so the page can be fed
+-- without starting a game. Overwritten each time: the files describe the
+-- modpack loaded right now, and a stale export would mislead the page.
+local export_string = export.PREFIX
+    .. helpers.encode_string(helpers.table_to_json(export.build(snapshot, plan, curve_string, mods)))
+helpers.write_file(OUTPUT_DIR .. "export.txt", export_string)
+helpers.write_file(OUTPUT_DIR .. "report.txt", report.build(snapshot, plan, curve_string) .. "\n")
+log(
+    "Research Cost Shaper: cost report and page export written to script-output/"
+        .. OUTPUT_DIR
+        .. " ("
+        .. #export_string
+        .. " characters)"
+)
 
--- Original and new costs, for the in-game export (read via prototypes.mod_data).
-local stored = {}
-for name, t in pairs(snapshot) do
-    local p = plan[name]
-    stored[name] = {
-        kind = t.kind,
-        skipped = p.skipped,
-        x = p.x,
-        spent = p.spent,
-        multiplier = p.multiplier,
-        count = t.count,
-        new_count = p.new_count,
-        formula = t.formula,
-        new_formula = p.new_formula,
-        time = t.time,
-        new_time = p.new_time,
-        ingredients = t.ingredients,
-        prerequisites = t.prerequisites,
-    }
-end
-
+-- Same export for the in-game /rcs-export window.
 data:extend({
     {
         type = "mod-data",
         name = "research-cost-shaper",
-        data = { format = 1, curve = curve_string, techs = stored },
+        data = { export = export_string, page_url = export.PAGE_URL },
     },
 })

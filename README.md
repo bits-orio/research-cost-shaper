@@ -9,8 +9,10 @@ each tech's new cost before you start a run.
 
 Early development, targeting Factorio 2.0 (2.1 build to follow from the same
 code). The mod applies the curve at every game launch to whatever techs your
-modpack has, and writes a per-tech cost report to `factorio-current.log`. The
-companion page and the export are not built yet.
+modpack has. At each launch it also writes `report.txt` (per-tech costs) and
+`export.txt` (for the companion page) to `script-output/research-cost-shaper/`;
+`/rcs-export` shows the same export in game. The companion page is not built
+yet.
 
 ## How it works
 

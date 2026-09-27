@@ -221,6 +221,19 @@ class ShapeTest(unittest.TestCase):
                        "10 -> 20", "900 -> 45,000", "red+green"]:
             self.assertIn(needle, text)
 
+    def test_export_carries_original_and_new_costs_and_sorted_mods(self):
+        out = self.lua.eval("""(function()
+            local raw = fake_raw()
+            local snap = techs.snapshot(raw)
+            local plan = shape.plan(snap, (curve.parse("v1;pts=0:2,1:50")))
+            return require("lib.export").build(snap, plan, "v1;pts=0:2,1:50", { zeta = "1.0.0", base = "2.0.77" })
+        end)()""")
+        self.assertEqual(out.format, 1)
+        self.assertEqual([out.mods[1][1], out.mods[2][1]], ["base", "zeta"])
+        self.assertEqual((out.techs["c"].count, out.techs["c"].new_count), (900, 45000))
+        self.assertEqual(out.techs["inf"].new_formula, "(2^L*1000)*50")
+        self.assertEqual(out.techs["free"].skipped, "exempt")
+
 
 if __name__ == "__main__":
     unittest.main()
