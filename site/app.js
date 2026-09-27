@@ -149,10 +149,12 @@ function renderSource() {
   const exp = state.exp;
   const sample = state.source.startsWith("Sample");
   $("#sample-banner").hidden = !sample;
+  $("#sample-name").textContent = sample ? `the ${state.source.replace(/^Sample: /, "")} sample` : "";
   const mods = exp.mods.filter(([n]) => n !== "research-cost-shaper");
   $("#source").innerHTML =
+    (sample ? `<span class="sample-pill">Sample data</span> ` : "") +
     `<strong>${esc(state.source)}</strong> · ${state.techs.length} techs · ` +
-    `<details><summary>${mods.length} mods</summary><ul>${mods.map(([n, v]) => `<li>${esc(n)} <span class="muted">${esc(v)}</span></li>`).join("")}</ul></details>`;
+    `<details><summary>${mods.length} mod${mods.length === 1 ? "" : "s"}</summary><ul>${mods.map(([n, v]) => `<li>${esc(n)} <span class="muted">${esc(v)}</span></li>`).join("")}</ul></details>`;
   $("#tech-search-list").innerHTML = state.techs.map((t) => `<option value="${esc(t.name)}">`).join("");
 }
 
@@ -263,6 +265,7 @@ const chart = createChart($("#chart"), $("#chart-tip"), {
   packColor,
   packLabel,
   onChange: (spec) => setSpec(spec, { writeInput: true, refit: false }),
+  onPreview: (spec) => { $("#curve-input").value = serialize(spec); },
 });
 
 const tree = createTree($("#tree"), {
@@ -353,7 +356,9 @@ async function loadFile(file) {
   try { await loadText(await file.text(), file.name); }
   catch (err) { showError(err.message); }
 }
-$("#file-input").addEventListener("change", (e) => e.target.files[0] && loadFile(e.target.files[0]));
+for (const input of document.querySelectorAll(".file-input")) {
+  input.addEventListener("change", (e) => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value = ""; });
+}
 document.addEventListener("dragover", (e) => { e.preventDefault(); document.body.classList.add("dropping"); });
 document.addEventListener("dragleave", (e) => { if (!e.relatedTarget) document.body.classList.remove("dropping"); });
 document.addEventListener("drop", (e) => {
@@ -362,7 +367,9 @@ document.addEventListener("drop", (e) => {
   const file = e.dataTransfer.files[0];
   if (file) loadFile(file);
 });
-$("#paste-open").addEventListener("click", () => { $("#paste-error").hidden = true; $("#paste-dialog").showModal(); $("#paste-text").focus(); });
+for (const b of document.querySelectorAll(".paste-open")) {
+  b.addEventListener("click", () => { $("#paste-error").hidden = true; $("#paste-dialog").showModal(); $("#paste-text").focus(); });
+}
 $("#paste-cancel").addEventListener("click", () => $("#paste-dialog").close());
 $("#paste-form").addEventListener("submit", async (e) => {
   e.preventDefault();

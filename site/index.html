@@ -17,8 +17,8 @@
     <p class="muted">Curve designer for the Factorio mod. Everything runs in your browser; nothing is uploaded.</p>
   </div>
   <div class="load">
-    <label class="button primary">Open rcs-export.txt<input type="file" id="file-input" accept=".txt,text/plain" hidden></label>
-    <button class="button" id="paste-open">Paste export</button>
+    <label class="button primary">Import rcs-export.txt<input type="file" class="file-input" accept=".txt,text/plain" hidden></label>
+    <button class="button paste-open">Paste export</button>
     <select id="sample-select" class="button" aria-label="Load a sample">
       <option value="">Samples…</option>
       <option value="space-age-2.0">Space Age (2.0)</option>
@@ -28,10 +28,23 @@
 </header>
 
 <p id="load-error" class="banner error" hidden></p>
-<p id="sample-banner" class="banner" hidden>
-  You're looking at sample data. To see your own modpack, open <code>script-output/research-cost-shaper/rcs-export.txt</code>
-  from your Factorio folder (the mod writes it every time Factorio starts), drop it anywhere on this page, or paste the text from <code>/rcs-export</code> in game.
-</p>
+<section id="sample-banner" class="sample-banner" hidden>
+  <div class="sample-text">
+    <p class="sample-kicker">Sample data</p>
+    <h2>This is not your modpack</h2>
+    <p>Everything below is <strong id="sample-name">Factorio's own techs</strong>, loaded as an example. To design a curve for your game, import the export the mod writes for your modpack:</p>
+    <ol>
+      <li>Start Factorio with Research Cost Shaper enabled. It writes <code>rcs-export.txt</code> every time Factorio starts.</li>
+      <li>Find it in <code>script-output/research-cost-shaper/</code> inside your Factorio folder
+        (<code>%APPDATA%\Factorio</code> on Windows, <code>~/.factorio</code> on Linux, <code>~/Library/Application Support/factorio</code> on macOS).</li>
+      <li>Import it here or drop it on the page. Or type <code>/rcs-export</code> in game and paste the text.</li>
+    </ol>
+  </div>
+  <div class="sample-actions">
+    <label class="button primary big">Import rcs-export.txt<input type="file" class="file-input" accept=".txt,text/plain" hidden></label>
+    <button class="button big paste-open">Paste export</button>
+  </div>
+</section>
 <div id="source" class="source"></div>
 
 <main>

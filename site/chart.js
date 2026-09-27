@@ -26,7 +26,7 @@ function niceStep(v, dir) {
   return dir < 0 ? Math.max(...steps.filter((s) => s <= v * (1 + 1e-9))) : Math.min(...steps.filter((s) => s >= v * (1 - 1e-9)));
 }
 
-export function createChart(svg, tooltip, { onChange, packColor, packLabel }) {
+export function createChart(svg, tooltip, { onChange, onPreview, packColor, packLabel }) {
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   let spec = null;
   let rows = [];
@@ -181,8 +181,9 @@ export function createChart(svg, tooltip, { onChange, packColor, packLabel }) {
     const right = dragging < spec.points.length - 1 ? spec.points[dragging + 1].x - 0.01 : 1;
     p.x = roundX(Math.min(right, Math.max(left, invX(q.x))));
     p.m = round(Math.min(range.hi, Math.max(range.lo, invY(q.y))));
+    // Only the chart redraws while dragging; costs are recalculated on release.
     draw();
-    emit();
+    onPreview?.(structuredClone(spec));
   });
   window.addEventListener("pointerup", () => {
     if (dragging === null) return;
