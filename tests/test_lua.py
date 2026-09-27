@@ -136,5 +136,91 @@ class ProgressTest(unittest.TestCase):
         self.assertEqual(got["a"], (10, 0))
 
 
+class ShapeTest(unittest.TestCase):
+    """techs.snapshot -> shape.plan -> techs.apply, on a fake data.raw."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.lua = lua_runtime()
+        cls.lua.execute("""
+            techs = require("lib.techs")
+            shape = require("lib.shape")
+            curve = require("lib.curve")
+            report = require("lib.report")
+            function fake_raw()
+                return {
+                    ["t-start"] = { name = "t-start" },
+                    ["a"] = { name = "a", prerequisites = { "t-start" },
+                        unit = { count = 10, time = 5, ingredients = { { "red", 1 } } } },
+                    ["b"] = { name = "b", prerequisites = { "a" },
+                        unit = { count = 45, time = 10,
+                            ingredients = { { type = "item", name = "red", amount = 1 }, { "green", 1 } } } },
+                    ["c"] = { name = "c", prerequisites = { "b" },
+                        unit = { count = 900, time = 30, ingredients = { { "red", 1 } } } },
+                    ["inf"] = { name = "inf", prerequisites = { "c" }, max_level = "infinite",
+                        unit = { count_formula = "2^L*1000", time = 60, ingredients = { { "red", 1 } } } },
+                    ["free"] = { name = "free", ignore_tech_cost_multiplier = true,
+                        unit = { count = 10, time = 1, ingredients = { { "red", 1 } } } },
+                }
+            end
+            function run(curve_string)
+                local raw = fake_raw()
+                local snap = techs.snapshot(raw)
+                local plan = shape.plan(snap, (curve.parse(curve_string)))
+                techs.apply(raw, plan)
+                return raw, plan, report.build(snap, plan, curve_string)
+            end
+        """)
+
+    def run_curve(self, s):
+        return self.lua.globals().run(s)
+
+    def test_snapshot_reads_both_ingredient_shapes(self):
+        snap = self.lua.eval("techs.snapshot(fake_raw())")
+        self.assertEqual(snap["b"].packs, 90)
+        self.assertEqual(snap["t-start"].kind, "trigger")
+        self.assertEqual(snap["inf"].kind, "formula")
+
+    def test_scales_counts_along_the_curve(self):
+        # spent: a=10, b=10+90=100, c=100+900=1000 -> x = 0, 0.5, 1
+        raw, plan, _ = self.run_curve("v1;pts=0:2,1:50")
+        self.assertEqual(raw["a"].unit.count, 20)
+        self.assertEqual(raw["b"].unit.count, 450)  # 45 * 10 (geometric mean of 2 and 50)
+        self.assertEqual(raw["c"].unit.count, 45000)
+
+    def test_rounds_half_up_and_never_below_one(self):
+        self.assertEqual(self.lua.eval("shape.round_count(2.5)"), 3)
+        self.assertEqual(self.lua.eval("shape.round_count(0.2)"), 1)
+        raw, _, _ = self.run_curve("v1;pts=0:0.01")
+        self.assertEqual(raw["a"].unit.count, 1)
+
+    def test_formula_uses_end_of_curve_unless_inf_given(self):
+        raw, _, _ = self.run_curve("v1;pts=0:2,1:50")
+        self.assertEqual(raw["inf"].unit.count_formula, "(2^L*1000)*50")
+        raw, _, _ = self.run_curve("v1;pts=0:2,1:50;inf=2.5")
+        self.assertEqual(raw["inf"].unit.count_formula, "(2^L*1000)*2.5")
+        raw, _, _ = self.run_curve("v1;pts=0:2,1:1")
+        self.assertEqual(raw["inf"].unit.count_formula, "2^L*1000")
+
+    def test_leaves_trigger_and_exempt_techs_alone(self):
+        raw, plan, _ = self.run_curve("v1;pts=0:9;time=3")
+        self.assertEqual(raw["free"].unit.count, 10)
+        self.assertEqual(raw["free"].unit.time, 1)
+        self.assertEqual(plan["free"].skipped, "exempt")
+        self.assertEqual(plan["t-start"].skipped, "trigger")
+
+    def test_time_multiplier(self):
+        raw, _, _ = self.run_curve("v1;pts=0:1;time=3")
+        self.assertEqual(raw["a"].unit.time, 15)
+        self.assertEqual(raw["inf"].unit.time, 180)
+        self.assertEqual(raw["a"].unit.count, 10)
+
+    def test_report_lists_every_tech_and_pack_set(self):
+        _, _, text = self.run_curve("v1;pts=0:2,1:50")
+        for needle in ["t-start", "unchanged (trigger)", "unchanged (exempt)", "(2^L*1000)*50",
+                       "10 -> 20", "900 -> 45,000", "red+green"]:
+            self.assertIn(needle, text)
+
+
 if __name__ == "__main__":
     unittest.main()

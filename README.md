@@ -7,8 +7,10 @@ each tech's new cost before you start a run.
 
 ## Status
 
-Early development, targeting Factorio 2.0. The curve maths is done and
-tested; the mod does not change costs yet.
+Early development, targeting Factorio 2.0 (2.1 build to follow from the same
+code). The mod applies the curve at every game launch to whatever techs your
+modpack has, and writes a per-tech cost report to `factorio-current.log`. The
+companion page and the export are not built yet.
 
 ## How it works
 
@@ -42,6 +44,8 @@ site/                                    companion web page (GitHub Pages)
 spec/                                    curve format and shared test cases
 tests/                                   Lua (5.2, via lupa) and JS tests
 tools/test.sh                            runs both test suites
+tools/report.sh <2.0|2.1> [mods-dir]     prints the cost report for a modpack
+                                         using headless Factorio
 ```
 
 ## Development

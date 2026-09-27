@@ -40,3 +40,13 @@ the cheapest tech is 0 and the most expensive is 1. See `lib/progress.lua`.
 `lib/curve.lua` (game) and `site/curve.js` (page) are line-for-line ports.
 `spec/curve-cases.json` holds shared cases; `tests/test_lua.py` also sweeps
 both implementations against each other.
+
+## Applying the multiplier
+
+- Techs costed by `count`: new count = round-half-up(count × curve(x)),
+  clamped to [1, 2^53].
+- Techs costed by `count_formula`: the formula becomes `(<formula>)*<inf>`,
+  with `inf` written as a plain decimal (six places). Left alone when `inf` is 1.
+- `time` multiplies research time per unit on every changed tech.
+- Trigger techs (no science packs) and techs with
+  `ignore_tech_cost_multiplier` are left unchanged.
