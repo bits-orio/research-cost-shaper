@@ -1,0 +1,22 @@
+name = "rcs-share"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# KV store for shared runs. Create with:
+#   wrangler kv namespace create SHARES
+# and paste the id below.
+[[kv_namespaces]]
+binding = "SHARES"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+[vars]
+PAGE_URL = "https://bits-orio.github.io/research-cost-shaper/"
+ALLOWED_ORIGINS = "https://bits-orio.github.io,http://127.0.0.1:8765,http://localhost:8765"
+
+# Free-tier abuse guard on POST /api/share. The worker works without this
+# binding (it just skips the check), so local dev and early deploys are fine
+# without setting it up first.
+[[ratelimits]]
+name = "UPLOAD_LIMIT"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }

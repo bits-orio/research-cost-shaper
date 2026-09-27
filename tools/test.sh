@@ -4,3 +4,4 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 python3 -m unittest discover tests
 node --test tests/*.test.js
+node --test worker/test/*.test.mjs
