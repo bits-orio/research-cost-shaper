@@ -33,6 +33,7 @@ export function createChart(svg, tooltip, { onChange, onPreview, packColor, pack
   let range = { lo: 0.1, hi: 100 };
   let dragging = null;
   let moved = false;
+  let pulse = false; // one-shot: the next draw animates the curve to confirm a change
 
   const X = (x) => M.l + x * PW;
   const Y = (m) => M.t + PH - ((Math.log10(m) - Math.log10(range.lo)) / (Math.log10(range.hi) - Math.log10(range.lo))) * PH;
@@ -59,7 +60,8 @@ export function createChart(svg, tooltip, { onChange, onPreview, packColor, pack
   const round = (m) => Number(m.toPrecision(m < 10 ? 2 : 3));
   const roundX = (x) => Math.round(x * 100) / 100;
 
-  function emit() { onChange(structuredClone(spec)); }
+  // kind: "change" (moved), "add" or "remove", so the page can answer each differently.
+  function emit(kind = "change") { onChange(structuredClone(spec), kind); }
 
   function draw() {
     svg.textContent = "";
@@ -117,7 +119,8 @@ export function createChart(svg, tooltip, { onChange, onPreview, packColor, pack
       const x = i / 240;
       d += `${i ? "L" : "M"}${X(x).toFixed(1)},${Y(f(x)).toFixed(1)}`;
     }
-    el("path", { d, class: "curve" }, svg);
+    el("path", { d, class: pulse ? "curve pulse" : "curve" }, svg);
+    pulse = false;
 
     // Hover layer.
     const hover = el("rect", { x: M.l, y: M.t, width: PW, height: PH + 18, class: "hover-layer" }, svg);
@@ -141,7 +144,7 @@ export function createChart(svg, tooltip, { onChange, onPreview, packColor, pack
       spec.points.sort((a, b) => a.x - b.x);
       fitRange();
       draw();
-      emit();
+      emit("add");
     });
 
     // Control points.
@@ -164,7 +167,7 @@ export function createChart(svg, tooltip, { onChange, onPreview, packColor, pack
         spec.points.splice(i, 1);
         fitRange();
         draw();
-        emit();
+        emit("remove");
       });
     });
 
@@ -205,9 +208,10 @@ export function createChart(svg, tooltip, { onChange, onPreview, packColor, pack
   function hideTip() { tooltip.hidden = true; }
 
   return {
-    update(nextSpec, nextRows, { refit = true } = {}) {
+    update(nextSpec, nextRows, { refit = true, flash = false } = {}) {
       spec = structuredClone(nextSpec);
       rows = nextRows;
+      pulse = flash;
       if (refit && dragging === null) fitRange();
       if (dragging === null) draw();
     },

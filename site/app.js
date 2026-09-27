@@ -1,5 +1,6 @@
 import { createChart } from "./chart.js";
-import { createTree } from "./tree.js";
+import { createTree, HEAT_STOPS } from "./tree.js";
+import { play, setSound, soundEnabled } from "./sound.js";
 
 const SHARE_API = "https://rcs-share.bits-orio.workers.dev";
 const Curve = window.RcsCurve;
@@ -44,6 +45,14 @@ function fmtHours(h) {
 }
 const packChips = (packs) =>
   `<span class="chips">${packs.map((p) => `<i style="background:${packColor(p)}" title="${packLabel(p)}"></i>`).join("")}</span>`;
+// Mods that ship with the game have no portal page.
+const BUILT_IN = new Set(["base", "core", "space-age", "quality", "elevated-rails", "recycler"]);
+function modList(mods) {
+  const items = mods.map(([n, v]) => BUILT_IN.has(n)
+    ? `<li>${esc(n)} <span class="muted">${esc(v)} · built in</span></li>`
+    : `<li><a href="https://mods.factorio.com/mod/${encodeURIComponent(n)}" target="_blank" rel="noopener">${esc(n)}</a> <span class="muted">${esc(v)}</span></li>`);
+  return `<details class="mods"><summary>${mods.length} mod${mods.length === 1 ? "" : "s"}</summary><ul>${items.join("")}</ul></details>`;
+}
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 // ---------------------------------------------------------------- storage
@@ -140,7 +149,7 @@ function showError(msg) {
 
 // ---------------------------------------------------------------- curve
 
-function setSpec(spec, { writeInput = false, refit = true } = {}) {
+function setSpec(spec, { writeInput = false, refit = true, flash = false } = {}) {
   state.spec = spec;
   state.rows = Model.predict(state.techs, spec);
   const text = serialize(spec);
@@ -150,13 +159,34 @@ function setSpec(spec, { writeInput = false, refit = true } = {}) {
   $("#inf-input").placeholder = `end of curve (×${fmt(Curve.build(spec)(1), 2)})`;
   $("#time-input").value = spec.time;
   history.replaceState(null, "", `#curve=${encodeURIComponent(text)}`);
-  render({ refit });
+  render({ refit, flash });
+}
+
+// A deliberate change: re-render, then confirm it with a tick and a brief
+// highlight of what moved, since the tables are usually off screen.
+function commit(spec, kind = "change", opts = {}) {
+  const before = state.totalAfter;
+  setSpec(spec, { writeInput: true, flash: true, ...opts });
+  play(kind);
+  showDelta(before, state.totalAfter);
+}
+
+function showDelta(before, after) {
+  const stats = $("#stats");
+  stats.classList.remove("flash");
+  void stats.offsetWidth; // restart the animation
+  stats.classList.add("flash");
+  const badge = $("#delta");
+  if (!badge || !before || before === after) return;
+  const pct = (after / before - 1) * 100;
+  badge.textContent = `${pct > 0 ? "+" : "−"}${Math.abs(pct) >= 10 ? Math.round(Math.abs(pct)) : Math.abs(pct).toFixed(1)}%`;
+  badge.className = `delta ${pct > 0 ? "up" : "down"}`;
 }
 
 // ---------------------------------------------------------------- render
 
-function render({ refit = true } = {}) {
-  chart.update(state.spec, state.rows, { refit });
+function render({ refit = true, flash = false } = {}) {
+  chart.update(state.spec, state.rows, { refit, flash });
   renderStats();
   renderSelection();
   renderTable();
@@ -166,18 +196,26 @@ function render({ refit = true } = {}) {
 function renderSource() {
   const exp = state.exp;
   const sample = state.source.startsWith("Sample");
+  const mods = exp.mods.filter(([n]) => n !== "research-cost-shaper");
   $("#sample-banner").hidden = !sample;
   $("#sample-name").textContent = sample ? `the ${state.source.replace(/^Sample: /, "")} sample` : "";
-  $("#shared-banner").hidden = !state.shared;
-  if (state.shared) {
-    const when = state.shared.created ? new Date(state.shared.created).toLocaleDateString(undefined, { dateStyle: "medium" }) : "";
-    $("#shared-text").textContent = `${state.shared.title ? `"${state.shared.title}"` : "A run"}${when ? `, shared ${when}` : ""}.`;
+
+  // A shared run is a showcase: its title leads the page.
+  const shared = state.shared;
+  $("#shared-hero").hidden = !shared;
+  $("#source").hidden = !!shared;
+  document.title = shared?.title ? `${shared.title} · Research Cost Shaper` : "Research Cost Shaper";
+  if (shared) {
+    const when = shared.created ? new Date(shared.created).toLocaleDateString(undefined, { dateStyle: "medium" }) : "";
+    const spaceAge = exp.mods.some(([n]) => n === "space-age");
+    $("#hero-title").textContent = shared.title || "Untitled run";
+    $("#hero-meta").innerHTML = [modList(mods), `${state.techs.length} techs`, spaceAge ? "Space Age" : "", when ? `shared ${esc(when)}` : ""]
+      .filter(Boolean).join(" · ");
+  } else {
+    $("#source").innerHTML =
+      (sample ? `<span class="sample-pill">Sample data</span> ` : "") +
+      `<strong>${esc(state.source)}</strong> · ${state.techs.length} techs · ${modList(mods)}`;
   }
-  const mods = exp.mods.filter(([n]) => n !== "research-cost-shaper");
-  $("#source").innerHTML =
-    (sample ? `<span class="sample-pill">Sample data</span> ` : "") +
-    `<strong>${esc(state.source)}</strong> · ${state.techs.length} techs · ` +
-    `<details><summary>${mods.length} mod${mods.length === 1 ? "" : "s"}</summary><ul>${mods.map(([n, v]) => `<li>${esc(n)} <span class="muted">${esc(v)}</span></li>`).join("")}</ul></details>`;
   $("#tech-search-list").innerHTML = state.techs.map((t) => `<option value="${esc(t.name)}">`).join("");
 }
 
@@ -186,6 +224,7 @@ function renderStats() {
   const before = counted.reduce((a, r) => a + r.count, 0);
   const after = counted.reduce((a, r) => a + r.now.count, 0);
   const formula = state.rows.filter((r) => r.kind === "formula" && !r.skipped);
+  state.totalAfter = after;
   const [exportSpec] = Curve.parse(state.exp.curve);
   let match;
   if (Model.sameSpec(exportSpec, state.spec)) {
@@ -197,11 +236,11 @@ function renderStats() {
     match = `<p class="muted">Preview. The export was made with <code>${esc(state.exp.curve)}</code>. <button class="link" id="reset-curve">Reset to it</button></p>`;
   }
   $("#stats").innerHTML = `
-    <div class="stat"><span>Research, all finite techs</span><b>${fmt(before)} → ${fmt(after)}</b><small>units · ×${fmt(after / before, 2)} overall</small></div>
+    <div class="stat"><span>Research, all finite techs <em id="delta" class="delta"></em></span><b>${fmt(before)} → ${fmt(after)}</b><small>units · ×${fmt(after / before, 2)} overall</small></div>
     <div class="stat"><span>At ${fmt(state.spm)} SPM</span><b>${fmtHours(before / state.spm / 60)} → ${fmtHours(after / state.spm / 60)}</b><small>to research everything once</small></div>
     <div class="stat"><span>Infinite techs</span><b>${formula.length}</b><small>×${fmt(formula[0]?.now.multiplier ?? 1, 2)} on their formulas</small></div>
     ${match}`;
-  $("#reset-curve")?.addEventListener("click", () => setSpec(exportSpec, { writeInput: true }));
+  $("#reset-curve")?.addEventListener("click", () => commit(exportSpec));
 }
 
 function renderSelection() {
@@ -210,6 +249,7 @@ function renderSelection() {
   const anc = t ? Model.ancestors(state.byName, name) : new Set();
   const desc = t ? Model.descendants(state.children, name) : new Set();
   tree.update(state.rows, state.key, { ancestors: anc, descendants: desc });
+  renderLegend();
   const panel = $("#tree-panel");
   if (!t) {
     panel.innerHTML = `<p class="muted">Click a tech to see what it takes to reach it. Drag to pan, scroll to zoom.</p>`;
@@ -287,7 +327,7 @@ function renderSets() {
 const chart = createChart($("#chart"), $("#chart-tip"), {
   packColor,
   packLabel,
-  onChange: (spec) => setSpec(spec, { writeInput: true, refit: false }),
+  onChange: (spec, kind) => commit(spec, kind, { refit: false }),
   onPreview: (spec) => { $("#curve-input").value = serialize(spec); },
 });
 
@@ -305,20 +345,23 @@ $("#curve-input").addEventListener("input", (e) => {
     return;
   }
   setSpec(spec);
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(() => showDelta(null, null), 450);
 });
+let typingTimer = null;
 
 $("#inf-input").addEventListener("change", (e) => {
   const v = Number(e.target.value);
   const spec = structuredClone(state.spec);
   if (e.target.value.trim() === "" || !(v > 0)) delete spec.inf;
   else spec.inf = v;
-  setSpec(spec, { writeInput: true });
+  commit(spec);
 });
 $("#time-input").addEventListener("change", (e) => {
   const v = Number(e.target.value);
   const spec = structuredClone(state.spec);
   spec.time = v > 0 ? v : 1;
-  setSpec(spec, { writeInput: true });
+  commit(spec);
 });
 
 $("#copy-curve").addEventListener("click", async () => {
@@ -326,6 +369,7 @@ $("#copy-curve").addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(text);
     $("#copy-curve").textContent = "Copied";
+    play("success");
   } catch {
     $("#curve-input").select();
     $("#copy-curve").textContent = "Press Ctrl+C";
@@ -361,7 +405,30 @@ $("#tech-table tbody").addEventListener("click", (e) => {
 $("#tree-search").addEventListener("change", (e) => {
   if (state.byName.has(e.target.value)) tree.select(e.target.value);
 });
-$("#tree-color").addEventListener("change", (e) => tree.setColorMode(e.target.value, state.rows));
+for (const b of document.querySelectorAll("[data-color]")) {
+  b.addEventListener("click", () => {
+    for (const o of document.querySelectorAll("[data-color]")) o.setAttribute("aria-checked", o === b);
+    tree.setColorMode(b.dataset.color, state.rows);
+    renderLegend();
+    play("change");
+  });
+}
+
+function renderLegend() {
+  const l = tree.legend();
+  if (!l) return;
+  if (l.mode === "pack") {
+    $("#tree-legend").innerHTML = `<span class="legend-what">Each tech is coloured by the newest science pack it needs:</span>
+      ${l.packs.map((p) => `<span class="legend-pack"><i style="background:${packColor(p)}"></i>${esc(packLabel(p))}</span>`).join("")}`;
+    return;
+  }
+  const what = l.mode === "cost" ? "its research cost after the curve" : "how much the curve multiplied its cost";
+  const lo = l.mode === "cost" ? `${fmt(l.lo)} units` : `×${fmt(l.lo, 2)}`;
+  const hi = l.mode === "cost" ? `${fmt(l.hi)} units` : `×${fmt(l.hi, 2)}`;
+  $("#tree-legend").innerHTML = `<span class="legend-what">Each tech is coloured by ${what}:</span>
+    <span class="legend-scale"><span>${lo}</span><i style="background:linear-gradient(90deg, ${HEAT_STOPS.join(", ")})"></i><span>${hi}</span></span>
+    <span class="muted">Grey: unchanged or trigger techs.</span>`;
+}
 $("#tree-fit").addEventListener("click", () => tree.fit());
 $("#tree-in").addEventListener("click", () => tree.zoom(1.25));
 $("#tree-out").addEventListener("click", () => tree.zoom(0.8));
@@ -412,6 +479,32 @@ $("#sample-select").addEventListener("change", async (e) => {
   e.target.value = "";
 });
 
+// Theme: auto follows the system; light and dark are remembered.
+const THEMES = ["auto", "light", "dark"];
+function applyTheme(t) {
+  if (t === "auto") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = t;
+  $("#theme-toggle").textContent = `Theme: ${t}`;
+}
+applyTheme(store.get("theme") || "auto");
+$("#theme-toggle").addEventListener("click", () => {
+  const next = THEMES[(THEMES.indexOf(store.get("theme") || "auto") + 1) % THEMES.length];
+  store.set("theme", next);
+  applyTheme(next);
+});
+
+function showSound() { $("#sound-toggle").textContent = `Sound: ${soundEnabled() ? "on" : "off"}`; }
+showSound();
+$("#sound-toggle").addEventListener("click", () => { setSound(!soundEnabled()); showSound(); play("change"); });
+
+// Mod lists close when you click anywhere else, or press Escape.
+document.addEventListener("click", (e) => {
+  for (const d of document.querySelectorAll("details.mods[open]")) if (!d.contains(e.target)) d.open = false;
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") for (const d of document.querySelectorAll("details.mods[open]")) d.open = false;
+});
+
 // Sharing: create a short link for the loaded export and the current curve.
 let lastShare = null; // { key, url }
 function shareKey() { return `${state.exportText.length}:${serialize(state.spec)}:${$("#share-title").value.trim()}`; }
@@ -450,6 +543,7 @@ $("#share-form").addEventListener("submit", async (e) => {
     $("#share-result").hidden = false;
     $("#share-url").select();
     $("#share-submit").textContent = "Copy link";
+    play("success");
   } catch (err) {
     $("#share-error").textContent = err instanceof TypeError ? "Couldn't reach the share service. Check your connection." : err.message;
     $("#share-error").hidden = false;

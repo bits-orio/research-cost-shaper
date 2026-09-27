@@ -17,6 +17,27 @@ function el(name, attrs = {}, parent) {
 
 const short = (s, n) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
+// Sequential scale, cheap -> expensive. Readable on light and dark pages; the
+// label colour flips on the darker half (see inkFor).
+export const HEAT_STOPS = ["#fdf3d0", "#fcd07e", "#f7994a", "#e0603a", "#b3304a", "#6a1f55"];
+
+function hexToRgb(h) {
+  const n = parseInt(h.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function heatColor(t) {
+  const x = Math.min(1, Math.max(0, t)) * (HEAT_STOPS.length - 1);
+  const i = Math.min(HEAT_STOPS.length - 2, Math.floor(x));
+  const a = hexToRgb(HEAT_STOPS[i]), b = hexToRgb(HEAT_STOPS[i + 1]);
+  const f = x - i;
+  return `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(" ")})`;
+}
+// True when white text reads better than dark on this fill.
+function darkFill(rgb) {
+  const [r, g, b] = rgb.match(/\d+/g).map(Number);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 140;
+}
+
 /** Column = longest prerequisite chain; rows ordered by barycentre sweeps. */
 export function layout(rows) {
   const byName = new Map(rows.map((r) => [r.name, r]));
@@ -73,6 +94,7 @@ export function createTree(container, { packColor, fmt, onSelect }) {
   let current = null; // { key, lay, nodes: Map, edges: [] }
   let selected = null;
   let colorMode = "cost";
+  let legend = null; // { mode, lo, hi } or { mode: "pack", packs }
 
   const apply = () => view.setAttribute("transform", `translate(${state.tx},${state.ty}) scale(${state.k})`);
 
@@ -135,17 +157,20 @@ export function createTree(container, { packColor, fmt, onSelect }) {
     current = { lay, nodes, edges };
   }
 
-  function heat(rows) {
-    const vals = rows.map((r) => {
-      if (colorMode === "multiplier") return r.now.multiplier;
-      return r.kind === "count" ? r.now.count : null;
-    }).filter((v) => v != null && v > 0).map(Math.log);
-    const lo = Math.min(...vals), hi = Math.max(...vals);
-    return (v) => (v == null || v <= 0 || hi === lo ? null : (Math.log(v) - lo) / (hi - lo));
+  // Log scale over the values shown, so cheap and expensive techs both get range.
+  function heat(values) {
+    const logs = values.filter((v) => v != null && v > 0).map(Math.log);
+    const lo = Math.min(...logs), hi = Math.max(...logs);
+    const t = (v) => (v == null || v <= 0 ? null : hi === lo ? 0.5 : (Math.log(v) - lo) / (hi - lo));
+    return { t, lo: Math.exp(lo), hi: Math.exp(hi) };
   }
 
+  const newestPack = (r) => r.ingredients.map((i) => i[0]).sort((a, b) => r.rank.get(b) - r.rank.get(a))[0];
+
   function paint(rows) {
-    const scale = heat(rows);
+    const valueOf = (r) => (r.skipped || r.kind === "trigger" ? null : colorMode === "multiplier" ? r.now.multiplier : r.kind === "count" ? r.now.count : null);
+    const scale = heat(rows.map(valueOf));
+    const packs = new Set();
     for (const r of rows) {
       const n = current.nodes.get(r.name);
       n.cost.textContent =
@@ -156,18 +181,21 @@ export function createTree(container, { packColor, fmt, onSelect }) {
       n.title.textContent = `${r.name}\nx ${r.x.toFixed(3)} · ${r.kind === "formula" ? r.now.formula : r.kind === "trigger" ? "trigger" : `${fmt(r.count)} → ${fmt(r.now.count)} units`}`;
       n.packs.textContent = "";
       r.ingredients.forEach(([pack], i) => el("rect", { x: NODE_W - 10 - i * 8, y: 6, width: 6, height: 6, rx: 1, fill: packColor(pack) }, n.packs));
-      let t = null, fill = "";
+      let fill = "";
       if (colorMode === "pack") {
-        const newest = r.ingredients.map((i) => i[0]).sort((a, b) => r.rank.get(b) - r.rank.get(a))[0];
-        fill = newest ? `color-mix(in oklab, ${packColor(newest)} 30%, var(--surface))` : "";
+        const newest = newestPack(r);
+        if (newest) { fill = `color-mix(in oklab, ${packColor(newest)} 62%, var(--surface))`; packs.add(newest); }
       } else {
-        t = scale(colorMode === "multiplier" ? r.now.multiplier : r.kind === "count" ? r.now.count : null);
-        if (t != null) fill = `color-mix(in oklab, var(--heat-hi) ${Math.round(t * 100)}%, var(--heat-lo))`;
+        const t = scale.t(valueOf(r));
+        if (t != null) fill = heatColor(t);
       }
       n.box.style.fill = fill;
-      n.g.classList.toggle("hot", t != null && t > 0.6);
+      n.g.classList.toggle("hot", colorMode !== "pack" && !!fill && darkFill(fill));
       n.g.classList.toggle("muted-node", !fill);
     }
+    legend = colorMode === "pack"
+      ? { mode: "pack", packs: [...packs].sort((a, b) => rows[0].rank.get(a) - rows[0].rank.get(b)) }
+      : { mode: colorMode, lo: scale.lo, hi: scale.hi };
   }
 
   function highlight() {
@@ -231,6 +259,7 @@ export function createTree(container, { packColor, fmt, onSelect }) {
       highlight();
     },
     setColorMode(mode, rows) { colorMode = mode; paint(rows); },
+    legend: () => legend,
     select(name) { select(name); centerOn(name); },
     selected: () => selected,
     fit,

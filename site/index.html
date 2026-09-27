@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Research Cost Shaper</title>
 <meta name="description" content="Design a research cost curve for Factorio and preview every tech's new cost for your modpack.">
+<meta name="color-scheme" content="light dark">
+<!-- The page has its own dark theme; stop Dark Reader from recolouring pack colours. -->
+<meta name="darkreader-lock">
+<script>try { const t = localStorage.getItem("rcs.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
 <link rel="stylesheet" href="style.css">
 <script src="curve.js"></script>
 <script src="model.js"></script>
@@ -25,6 +29,8 @@
       <option value="space-age-2.0">Space Age (2.0)</option>
       <option value="vanilla-2.0">Vanilla (2.0)</option>
     </select>
+    <button class="button quiet" id="theme-toggle" title="Switch between automatic, light and dark">Theme: auto</button>
+    <button class="button quiet" id="sound-toggle" title="Short, quiet sounds when the curve changes">Sound: on</button>
   </div>
 </header>
 
@@ -46,10 +52,12 @@
     <button class="button big paste-open">Paste export</button>
   </div>
 </section>
-<p id="shared-banner" class="banner shared" hidden>
-  <strong>Shared run.</strong> <span id="shared-text"></span>
-  This is someone's modpack and curve. Your changes stay on your screen until you share them again.
-</p>
+<section id="shared-hero" class="hero" hidden>
+  <p class="hero-kicker">Shared run</p>
+  <h2 id="hero-title"></h2>
+  <p id="hero-meta" class="hero-meta"></p>
+  <p class="hero-note">Someone's modpack and research curve. Changes you make stay on your screen until you share them again.</p>
+</section>
 <div id="source" class="source"></div>
 
 <main>
@@ -83,18 +91,18 @@
     <div class="tree-tools">
       <input id="tree-search" list="tech-search-list" placeholder="Find a tech…" aria-label="Find a tech">
       <datalist id="tech-search-list"></datalist>
-      <label>Colour by
-        <select id="tree-color">
-          <option value="cost">cost after</option>
-          <option value="multiplier">multiplier</option>
-          <option value="pack">newest science pack</option>
-        </select>
-      </label>
+      <div class="seg" role="radiogroup" aria-label="Colour the tree by">
+        <span class="seg-label">Colour by</span>
+        <button role="radio" data-color="cost" aria-checked="true">New cost</button>
+        <button role="radio" data-color="multiplier" aria-checked="false">Multiplier</button>
+        <button role="radio" data-color="pack" aria-checked="false">Science pack</button>
+      </div>
       <span class="spacer"></span>
       <button class="button" id="tree-out" aria-label="Zoom out">−</button>
       <button class="button" id="tree-in" aria-label="Zoom in">+</button>
       <button class="button" id="tree-fit">Fit</button>
     </div>
+    <div id="tree-legend" class="tree-legend"></div>
     <div class="tree-area">
       <div id="tree" class="tree"></div>
       <aside id="tree-panel" class="tree-panel"></aside>
@@ -122,8 +130,7 @@
 </main>
 
 <footer class="muted">
-  <a href="https://github.com/bits-orio/research-cost-shaper">Source on GitHub</a> ·
-  Inspired by RedRafe's <a href="https://mods.factorio.com/mod/technology-overload">Technology Overload</a>
+  <a href="https://github.com/bits-orio/research-cost-shaper">Source on GitHub</a>
 </footer>
 
 <dialog id="share-dialog">
