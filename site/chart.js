@@ -49,7 +49,7 @@ export function createChart(svg, tooltip, { onChange, onPreview, packColor, pack
   // pull instead of drag, release, repeat.
   const DECADE = 70;
   const MIN_MULT = 0.001;
-  const MAX_MULT = 1e7;
+  const MAX_MULT = window.RcsCurve.MAX_MULTIPLIER; // Factorio's own ceiling, x100,000
   const clampMult = (m) => Math.min(MAX_MULT, Math.max(MIN_MULT, m));
   function dragValue(py) {
     if (py < M.t) return clampMult(dragBase.hi * 10 ** ((M.t - py) / DECADE));

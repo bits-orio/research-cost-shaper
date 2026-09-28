@@ -115,8 +115,8 @@
       <p id="curve-error" class="error-text" hidden></p>
       <button class="button primary" id="copy-curve"><svg class="icon"><use href="#i-copy"/></svg><span>Copy for mod settings</span></button>
       <div class="fields">
-        <label>Infinite techs ×<input id="inf-input" type="number" min="0" step="any"></label>
-        <label>Research time ×<input id="time-input" type="number" min="0" step="any" value="1"></label>
+        <label>Infinite techs ×<input id="inf-input" type="number" min="0" max="100000" step="any"></label>
+        <label>Research time ×<input id="time-input" type="number" min="0" max="100000" step="any" value="1"></label>
       </div>
       <div id="stats" class="stats"></div>
     </aside>

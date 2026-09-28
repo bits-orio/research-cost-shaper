@@ -40,10 +40,18 @@ local function parse_number(s)
     return n
 end
 
+-- Factorio's own technology price multiplier tops out at 100000 (since 2.1.8),
+-- so the curve uses the same ceiling: one number means the same everywhere.
+-- The curve never overshoots its points, so no tech goes past it either.
+curve.MAX_MULTIPLIER = 100000
+
 local function parse_positive(s, label)
     local n = parse_number(s)
     if n == nil or n <= 0 then
         return nil, label .. " must be a positive number, got '" .. s .. "'"
+    end
+    if n > curve.MAX_MULTIPLIER then
+        return nil, label .. " can be at most 100000 (Factorio's own limit for the technology price multiplier), got '" .. s .. "'"
     end
     return n
 end

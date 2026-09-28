@@ -21,9 +21,14 @@
     return n;
   }
 
+  // Factorio's own technology price multiplier tops out at 100000 (since
+  // 2.1.8); mirrors curve.MAX_MULTIPLIER in lib/curve.lua.
+  const MAX_MULTIPLIER = 100000;
+
   function parsePositive(s, label) {
     const n = parseNumber(s);
     if (n === null || n <= 0) return [null, `${label} must be a positive number, got '${s}'`];
+    if (n > MAX_MULTIPLIER) return [null, `${label} can be at most 100000 (Factorio's own limit for the technology price multiplier), got '${s}'`];
     return [n, null];
   }
 
@@ -130,5 +135,5 @@
     };
   }
 
-  return { parse, build };
+  return { parse, build, MAX_MULTIPLIER };
 });

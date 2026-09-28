@@ -16,6 +16,12 @@ sections are ignored, so a trailing `;` is fine.
 | `inf=m` | no | Multiplier for techs whose cost is a formula (infinite and leveled research). Defaults to the curve's value at x = 1. |
 | `time=m` | no | Multiplier for research time per unit. Defaults to 1. |
 
+Every multiplier (curve points, `inf`, `time`) must be greater than 0 and at
+most 100000, the same ceiling as Factorio's own technology price multiplier
+(since 2.1.8). The curve never overshoots its points, so no tech's multiplier
+exceeds it. Research counts themselves can go higher (base cost times up to
+100000); the game accepts them.
+
 Numbers are plain decimals, optionally with an exponent (`1e3`). Hex,
 `Infinity` and `NaN` are rejected. Unknown or repeated sections are errors, so
 a typo fails loudly at startup instead of being silently ignored.

@@ -438,14 +438,14 @@ $("#curve-input").addEventListener("input", (e) => {
 let typingTimer = null;
 
 $("#inf-input").addEventListener("change", (e) => {
-  const v = Number(e.target.value);
+  const v = Math.min(Number(e.target.value), Curve.MAX_MULTIPLIER);
   const spec = structuredClone(state.spec);
   if (e.target.value.trim() === "" || !(v > 0)) delete spec.inf;
   else spec.inf = v;
   commit(spec);
 });
 $("#time-input").addEventListener("change", (e) => {
-  const v = Number(e.target.value);
+  const v = Math.min(Number(e.target.value), Curve.MAX_MULTIPLIER);
   const spec = structuredClone(state.spec);
   spec.time = v > 0 ? v : 1;
   commit(spec);

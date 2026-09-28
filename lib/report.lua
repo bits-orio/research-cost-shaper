@@ -64,16 +64,24 @@ local function per_unit(ingredients)
     return total
 end
 
+-- x2.45, x88.2, x1,000, x100,000: no scientific notation for big multipliers.
+local function fmt_mult(m)
+    if m >= 1000 then
+        return "x" .. thousands(math.floor(m + 0.5))
+    end
+    return "x" .. string.format("%.3g", m)
+end
+
 local function tech_line(name, t, p, rank)
     local head = string.format("  %.3f  %-44s", p.x, name)
     if p.skipped then
         return head .. "  unchanged (" .. p.skipped .. ")"
     end
     if t.kind == "formula" then
-        return head .. string.format("  x%-9.3g  %s", p.multiplier, p.new_formula or t.formula)
+        return head .. string.format("  %-10s  %s", fmt_mult(p.multiplier), p.new_formula or t.formula)
     end
     return head
-        .. string.format("  x%-9.3g  %s -> %s", p.multiplier, thousands(t.count), thousands(p.new_count or t.count))
+        .. string.format("  %-10s  %s -> %s", fmt_mult(p.multiplier), thousands(t.count), thousands(p.new_count or t.count))
         .. "  [" .. pack_key(t.ingredients, rank) .. "]"
 end
 

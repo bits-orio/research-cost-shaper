@@ -1,11 +1,12 @@
 {
   "_comment": "Shared by tests/test_lua.py (lib/curve.lua) and tests/curve.test.js (site/curve.js). Eval expectations here are derived by hand; tests/test_lua.py additionally sweeps both implementations against each other.",
   "parse_ok": [
-    { "input": "v1;pts=0:1", "points": [[0, 1]], "inf": null, "time": 1 },
-    { "input": "v1; pts=0:2, 0.5:4, 1:10", "points": [[0, 2], [0.5, 4], [1, 10]], "inf": null, "time": 1 },
-    { "input": "  v1 ; pts = 0:40 , 1:1 ; inf=60 ; time=2.5 ; ", "points": [[0, 40], [1, 1]], "inf": 60, "time": 2.5 },
-    { "input": "v1;inf=5;pts=.25:1e2,1:3", "points": [[0.25, 100], [1, 3]], "inf": 5, "time": 1 },
-    { "input": "v1;pts=0:+5,1:5.", "points": [[0, 5], [1, 5]], "inf": null, "time": 1 }
+    {"input": "v1;pts=0:1", "points": [[0, 1]], "inf": null, "time": 1},
+    {"input": "v1; pts=0:2, 0.5:4, 1:10", "points": [[0, 2], [0.5, 4], [1, 10]], "inf": null, "time": 1},
+    {"input": "  v1 ; pts = 0:40 , 1:1 ; inf=60 ; time=2.5 ; ", "points": [[0, 40], [1, 1]], "inf": 60, "time": 2.5},
+    {"input": "v1;inf=5;pts=.25:1e2,1:3", "points": [[0.25, 100], [1, 3]], "inf": 5, "time": 1},
+    {"input": "v1;pts=0:+5,1:5.", "points": [[0, 5], [1, 5]], "inf": null, "time": 1},
+    {"input": "v1; pts=0:0.001, 1:100000; inf=100000; time=100000", "points": [[0, 0.001], [1, 100000]], "inf": 100000, "time": 100000}
   ],
   "parse_error": [
     "",
@@ -30,23 +31,27 @@
     "v1;pts=0:.",
     "v1;pts=0:1;inf=0",
     "v1;pts=0:1;time=abc",
-    "v1;pts=0:1;time="
+    "v1;pts=0:1;time=",
+    "v1;pts=0:100001",
+    "v1;pts=0:2, 1:1e6",
+    "v1;pts=0:1;inf=200000",
+    "v1;pts=0:1;time=100000.5"
   ],
   "eval": [
-    { "curve": "v1;pts=0.3:7", "x": 0, "expect": 7 },
-    { "curve": "v1;pts=0.3:7", "x": 1, "expect": 7 },
-    { "curve": "v1;pts=0:4,1:100", "x": 0, "expect": 4 },
-    { "curve": "v1;pts=0:4,1:100", "x": 1, "expect": 100 },
-    { "curve": "v1;pts=0:4,1:100", "x": 0.5, "expect": 20 },
-    { "curve": "v1;pts=0:4,1:100", "x": -3, "expect": 4 },
-    { "curve": "v1;pts=0:4,1:100", "x": 9, "expect": 100 },
-    { "curve": "v1;pts=0.2:10,0.8:40", "x": 0.1, "expect": 10 },
-    { "curve": "v1;pts=0.2:10,0.8:40", "x": 0.5, "expect": 20 },
-    { "curve": "v1;pts=0.2:10,0.8:40", "x": 0.95, "expect": 40 },
-    { "curve": "v1;pts=0:40,1:1", "x": 0.5, "expect": 6.324555320336759 },
-    { "curve": "v1;pts=0:5,0.4:5,1:5", "x": 0.7, "expect": 5 },
-    { "curve": "v1;pts=0:2,0.5:4,1:8", "x": 0.25, "expect": 2.8284271247461903 },
-    { "curve": "v1;pts=0:2,0.5:4,1:8", "x": 0.75, "expect": 5.656854249492381 },
-    { "curve": "v1;pts=0:20,0.4:4,1:60", "x": 0.4, "expect": 4 }
+    {"curve": "v1;pts=0.3:7", "x": 0, "expect": 7},
+    {"curve": "v1;pts=0.3:7", "x": 1, "expect": 7},
+    {"curve": "v1;pts=0:4,1:100", "x": 0, "expect": 4},
+    {"curve": "v1;pts=0:4,1:100", "x": 1, "expect": 100},
+    {"curve": "v1;pts=0:4,1:100", "x": 0.5, "expect": 20},
+    {"curve": "v1;pts=0:4,1:100", "x": -3, "expect": 4},
+    {"curve": "v1;pts=0:4,1:100", "x": 9, "expect": 100},
+    {"curve": "v1;pts=0.2:10,0.8:40", "x": 0.1, "expect": 10},
+    {"curve": "v1;pts=0.2:10,0.8:40", "x": 0.5, "expect": 20},
+    {"curve": "v1;pts=0.2:10,0.8:40", "x": 0.95, "expect": 40},
+    {"curve": "v1;pts=0:40,1:1", "x": 0.5, "expect": 6.324555320336759},
+    {"curve": "v1;pts=0:5,0.4:5,1:5", "x": 0.7, "expect": 5},
+    {"curve": "v1;pts=0:2,0.5:4,1:8", "x": 0.25, "expect": 2.8284271247461903},
+    {"curve": "v1;pts=0:2,0.5:4,1:8", "x": 0.75, "expect": 5.656854249492381},
+    {"curve": "v1;pts=0:20,0.4:4,1:60", "x": 0.4, "expect": 4}
   ]
 }
