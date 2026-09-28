@@ -17,11 +17,20 @@ log-scale grid, in the companion page's orange. As on LTR's card, a centred
 black halo separates the letters from what is under them without changing
 the letters themselves.
 
+In the top-left corner, where the curve leaves room, sits the companion
+page's brand mark: the lab flask on its orange tile. It is read from the
+i-brand symbol in site/index.html, so the page, its favicon and this card
+share one drawing. ImageMagick rasterizes the flask (it handles the arcs but
+not SVG gradients); the tile and its gradient are drawn here.
+
 Drawn at SUPERSAMPLE times the size and scaled down, so the curve stays smooth.
 
 Run from the repo root:  python3 tools/gen_thumbnail.py
 """
 
+import io
+import re
+import subprocess
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -56,6 +65,41 @@ CURVE_WIDTH = 7
 # The curve: low and flat on the left, climbing to the top right, as a
 # "hard late game" curve looks on the page's log scale. Normalised 0..1.
 CURVE_POINTS = [(0.0, 0.16), (0.3, 0.26), (0.55, 0.40), (0.78, 0.62), (1.0, 0.92)]
+
+
+# The brand mark: size and top-left corner, inside the frame.
+MARK_SIZE = 84
+MARK_POS = (36, 36)
+
+
+def brand_mark(root):
+    """The page's i-brand symbol as an RGBA tile, MARK_SIZE square."""
+    html = (root / "site/index.html").read_text()
+    symbol = re.search(r'<symbol id="i-brand" viewBox="0 0 32 32">(.*?)</symbol>', html, re.S).group(1)
+    outline, liquid = re.findall(r'<path d="([^"]+)"', symbol)
+    stops = re.search(r'<linearGradient id="brand-fill"(.*?)</linearGradient>', html, re.S).group(1)
+    top, bottom = (tuple(int(c[i:i + 2], 16) for i in (1, 3, 5)) for c in re.findall(r'stop-color="(#[0-9a-fA-F]{6})"', stops))
+
+    big = MARK_SIZE * 4
+    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="{big}" height="{big}">'
+           f'<path d="{outline}" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
+           f'<path d="{liquid}" fill="#fff"/></svg>')
+    png = subprocess.run(["convert", "-background", "none", "svg:-", "png:-"], input=svg.encode(),
+                         capture_output=True, check=True).stdout
+    flask = Image.open(io.BytesIO(png)).convert("RGBA").resize((big, big), Image.Resampling.LANCZOS)
+
+    # Diagonal gradient, top-left to bottom-right, as the SVG's x1=0 y1=0 x2=1 y2=1.
+    tile = Image.new("RGBA", (big, big))
+    px = tile.load()
+    for y in range(big):
+        for x in range(big):
+            t = (x + y) / (2 * (big - 1))
+            px[x, y] = tuple(round(top[i] + (bottom[i] - top[i]) * t) for i in range(3)) + (255,)
+    mask = Image.new("L", (big, big), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, big - 1, big - 1], radius=big * 7 / 32, fill=255)
+    tile.putalpha(mask)
+    tile.alpha_composite(flask)
+    return tile.resize((MARK_SIZE, MARK_SIZE), Image.Resampling.LANCZOS)
 
 
 def smooth(points, steps=64):
@@ -117,11 +161,17 @@ def glow_for(layer):
     return halo
 
 
-def build():
+def build(root):
     img = underlay()
     d = ImageDraw.Draw(img)
     far = SIZE - 1 - FRAME_INSET
     d.rectangle([FRAME_INSET, FRAME_INSET, far, far], outline=FRAME, width=FRAME_WIDTH)
+
+    mark = brand_mark(root)
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    layer.paste(mark, MARK_POS, mark)
+    img.paste(glow_for(layer), (0, 0), glow_for(layer))
+    img.paste(layer, (0, 0), layer)
 
     layer, (left, top, right, bottom) = draw_letters()
     offset = (round(SIZE / 2 - (left + right) / 2), round(LETTERS_CENTRE_Y - (top + bottom) / 2))
@@ -141,7 +191,7 @@ def build():
 def main():
     root = Path(__file__).resolve().parent.parent
     out = root / "thumbnail.png"
-    build().save(out, optimize=True)
+    build(root).save(out, optimize=True)
     print(f"wrote {out}")
 
 
