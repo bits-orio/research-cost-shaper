@@ -6,3 +6,6 @@ dist/
 
 # Python
 __pycache__/
+
+# Local GUI runs (dev/run-gui.sh)
+.run/

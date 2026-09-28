@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "title": "Research Cost Shaper",
   "author": "bits-orio",
-  "description": "Set research costs with a curve you design: choose the tech cost multiplier for early, mid and late game, and for infinite research. Check every tech's new science cost for your exact modpack on a companion web page before you start.",
+  "description": "Put research costs on a curve you design. Set the tech cost multiplier for early game, late game and infinite research, preview every tech's new science cost for your exact modpack on a companion web page, then paste one line into the settings. Tune difficulty for any modpack. In the spirit of Technology Overload.",
   "homepage": "https://github.com/bits-orio/research-cost-shaper",
   "factorio_version": "2.0",
   "dependencies": [

@@ -1,0 +1,13 @@
+{
+  "mod": "research-cost-shaper",
+  "title": "Research Cost Shaper",
+  "summary": "Put research costs on a curve you design. Set the tech cost multiplier for early game, late game and infinite research, preview every tech's new science cost for your exact modpack on a companion web page, then paste one line into the settings. Tune difficulty for any modpack. In the spirit of Technology Overload.",
+  "category": "tweaks",
+  "tags": [
+    "manufacturing"
+  ],
+  "license": "default_mit",
+  "homepage": "https://discord.gg/tWz4FT74pH",
+  "source_url": "https://github.com/bits-orio/research-cost-shaper",
+  "deprecated": false
+}

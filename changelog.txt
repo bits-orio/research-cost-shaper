@@ -1,0 +1,11 @@
+---------------------------------------------------------------------------------------------------
+Version: 0.1.0
+Date: 2026-09-27
+  Features:
+    - Research cost multiplier on a curve you design, from the first research to the last, with separate multipliers for infinite research and research time.
+    - Techs are placed on the curve by the science spent to reach them, so techs from any mod land where their cost puts them.
+    - Writes rcs-export.txt and rcs-report.txt to script-output/research-cost-shaper/ every time the game starts, for the companion page at https://bits-orio.github.io/research-cost-shaper/
+    - /rcs-export shows the export and the page address in game, with Select buttons for copying.
+    - /rcs-check, and a check at game start, report techs that a later mod or the map's price multiplier changed after the curve was applied.
+  Info:
+    - Techs that opt out of cost multipliers (ignore_tech_cost_multiplier) and trigger techs are left unchanged.
