@@ -337,3 +337,10 @@ button.link { display: inline-flex; align-items: center; gap: 4px; }
 .small { font-size: 12px; }
 .lvl { color: var(--muted); font-size: 11px; margin-left: 2px; }
 .tree-panel h3 .link { color: var(--muted); }
+
+/* the curve on screen vs the one the game uses */
+.preview-notice, .switch-notice { font-size: 13px; border-radius: 8px; padding: 8px 10px; line-height: 1.45; }
+.preview-notice { background: color-mix(in oklab, #f0a030 16%, var(--surface)); border: 1px solid color-mix(in oklab, #f0a030 60%, transparent); }
+.switch-notice { background: color-mix(in oklab, var(--share) 12%, var(--surface)); border: 1px solid color-mix(in oklab, var(--share) 50%, transparent); }
+.preview-notice code { overflow-wrap: anywhere; }
+.in-game { margin: 0 0 4px; padding: 4px 8px; border-left: 3px solid #f0a030; background: color-mix(in oklab, #f0a030 10%, transparent); font-size: 12.5px; }

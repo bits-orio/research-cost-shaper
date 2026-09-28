@@ -109,12 +109,12 @@ async function decode(text) {
 
 // ---------------------------------------------------------------- loading
 
-// Which curve a load shows, in order: the page address when reopening a page
-// you were editing (preferHash), the run's own curve (shares, saved runs), the
-// curve you are working on (importing a new export keeps it), the address,
-// and finally the curve the export was made with.
-async function loadText(text, source, { remember = true, shared = null, curve = null, keepCurve = false, preferHash = false } = {}) {
-  const current = keepCurve ? state.spec : null;
+// Which curve a load shows: the page address only when reopening a page you
+// were editing (preferHash); else the run's own curve (shares, saved runs);
+// else the curve the export was made with, i.e. what the game actually uses.
+// Imports offer a way back to the curve you were editing (offerPrevious).
+async function loadText(text, source, { remember = true, shared = null, curve = null, preferHash = false, offerPrevious = false } = {}) {
+  const previous = offerPrevious ? state.spec : null;
   const exp = await decode(text);
   state.exp = exp;
   state.exportText = text.trim();
@@ -132,7 +132,12 @@ async function loadText(text, source, { remember = true, shared = null, curve = 
   if (remember) { working.set("export", text); working.set("source", source); }
   renderSource();
   const fromRun = curve ? Curve.parse(curve)[0] : null;
-  setSpec((preferHash && curveFromHash()) || fromRun || current || curveFromHash() || Curve.parse(exp.curve)[0], { writeInput: true });
+  state.previous = null;
+  setSpec((preferHash && curveFromHash()) || fromRun || Curve.parse(exp.curve)[0], { writeInput: true });
+  if (previous && !Model.sameSpec(previous, state.spec)) {
+    state.previous = previous;
+    renderStats();
+  }
 }
 
 const summaryOf = () => ({
@@ -156,9 +161,9 @@ async function loadShare(id, { preferHash = false } = {}) {
   addRecent({ kind: "opened", shareId: id, title: rec.title || "", curve: rec.curve, summary: summaryOf() });
 }
 
-async function loadSample(name, label) {
+async function loadSample(name, label, opts = {}) {
   const res = await fetch(`samples/${name}.txt`);
-  await loadText(await res.text(), `Sample: ${label}`, { remember: false, keepCurve: true });
+  await loadText(await res.text(), `Sample: ${label}`, { remember: false, ...opts });
 }
 
 function curveFromHash() {
@@ -196,6 +201,7 @@ function setSpec(spec, { writeInput = false, refit = true, flash = false } = {})
 // highlight of what moved, since the tables are usually off screen.
 function commit(spec, kind = "change", opts = {}) {
   const before = state.totalAfter;
+  state.previous = null;
   setSpec(spec, { writeInput: true, flash: true, ...opts });
   play(kind);
   showDelta(before, state.totalAfter);
@@ -265,7 +271,14 @@ function renderStats() {
       ? `<p class="warn">${bad.length} techs differ from what the game applied: ${bad.slice(0, 5).map((r) => esc(r.name)).join(", ")}. Please report this.</p>`
       : `<p class="ok">Matches the costs the game applied, for all ${state.rows.length} techs.</p>`;
   } else {
-    match = `<p class="muted">Preview. The export was made with <code>${esc(state.exp.curve)}</code>. <button class="link" id="reset-curve">Reset to it</button></p>`;
+    match = `<div class="preview-notice"><b>Preview: your game doesn't use this curve yet.</b>
+      This export was made with <code>${esc(state.exp.curve)}</code>, so that's what your game has now.
+      To get these numbers in game, copy this curve into the Cost curve setting and restart.
+      <button class="link" id="reset-curve">Show my game's curve</button></div>`;
+  }
+  if (state.previous) {
+    match += `<div class="switch-notice">Showing the curve this export was made with, which is what your game uses.
+      <button class="link" id="use-previous">Switch back to the curve I was editing</button></div>`;
   }
   $("#stats").innerHTML = `
     <div class="stat"><span>Research, all finite techs <em id="delta" class="delta"></em></span><b>${fmt(before)} → ${fmt(after)}</b><small>units · ×${fmt(after / before, 2)} overall</small></div>
@@ -273,6 +286,7 @@ function renderStats() {
     <div class="stat"><span>Infinite techs</span><b>${formula.length}</b><small>×${fmt(formula[0]?.now.multiplier ?? 1, 2)} on their formulas</small></div>
     ${match}`;
   $("#reset-curve")?.addEventListener("click", () => commit(exportSpec));
+  $("#use-previous")?.addEventListener("click", () => commit(state.previous));
 }
 
 function renderSelection() {
@@ -312,6 +326,11 @@ function ownCost(t) {
       <p>Unlocked by an action instead: <b>${esc(Model.describeTrigger(t.trigger))}</b>. The curve doesn't change triggers.</p>${where}`;
   }
   const each = t.time ? ` · ${fmt(t.now.time, 2)} s per unit` : "";
+  const previewing = !Model.sameSpec(Curve.parse(state.exp.curve)[0], state.spec);
+  const gameNow = t.kind === "formula" ? window.RcsFormula.evaluate(t.game.formula, t.level) : t.game.count;
+  const inGame = previewing && gameNow != null
+    ? `<p class="in-game">In your game now: <b>${fmt(Math.round(gameNow))}</b> units (the export's curve). The number above is this page's preview.</p>`
+    : "";
   const packsLine = `<p>${packs} ${t.ingredients.length} pack${t.ingredients.length === 1 ? "" : "s"} per unit${each}</p>`;
   if (t.skipped) {
     return `<p class="own-big">${fmt(t.count)} units</p><p class="muted">Unchanged: this tech opts out of cost multipliers.</p>${packsLine}${where}`;
@@ -321,11 +340,11 @@ function ownCost(t) {
     const numbers = t.levelCost != null
       ? `<p class="own-big">${fmt(t.levelCost)} → <b>${fmt(t.now.levelCost)}</b> units <span class="muted">×${fmt(t.now.multiplier, 2)}</span></p>`
       : `<p class="own-big"><code>${esc(t.now.formula)}</code></p>`;
-    return `${numbers}<p class="muted">Cost of ${lvl}; each level follows <code>${esc(t.now.formula)}</code>.</p>${packsLine}
+    return `${numbers}${inGame}<p class="muted">Cost of ${lvl}; each level follows <code>${esc(t.now.formula)}</code>.</p>${packsLine}
       <p>${fmtHours((t.now.levelCost ?? 0) / state.spm / 60)} for this level at ${fmt(state.spm)} SPM</p>${where}`;
   }
   return `<p class="own-big">${fmt(t.count)} → <b>${fmt(t.now.count)}</b> units <span class="muted">×${fmt(t.now.multiplier, 2)}</span></p>
-    ${packsLine}<p>${fmtHours(t.count / state.spm / 60)} → <b>${fmtHours(t.now.count / state.spm / 60)}</b> at ${fmt(state.spm)} SPM</p>${where}`;
+    ${inGame}${packsLine}<p>${fmtHours(t.count / state.spm / 60)} → <b>${fmtHours(t.now.count / state.spm / 60)}</b> at ${fmt(state.spm)} SPM</p>${where}`;
 }
 
 // Cost shown in the tables and tree: count techs by count, formula techs by
@@ -514,7 +533,7 @@ for (const b of document.querySelectorAll(".tabs [data-tab]")) b.addEventListene
 // Loading: file picker, drag and drop, paste, samples.
 async function loadFile(file) {
   showError("");
-  try { await loadText(await file.text(), file.name, { keepCurve: true }); }
+  try { await loadText(await file.text(), file.name, { offerPrevious: true }); }
   catch (err) { showError(err.message); }
 }
 for (const input of document.querySelectorAll(".file-input")) {
@@ -535,7 +554,7 @@ $("#paste-cancel").addEventListener("click", () => $("#paste-dialog").close());
 $("#paste-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   try {
-    await loadText($("#paste-text").value, "Pasted export", { keepCurve: true });
+    await loadText($("#paste-text").value, "Pasted export", { offerPrevious: true });
     $("#paste-text").value = "";
     $("#paste-dialog").close();
     showError("");
@@ -548,7 +567,7 @@ $("#sample-select").addEventListener("change", async (e) => {
   const opt = e.target.selectedOptions[0];
   if (opt.value) {
     store.set("sampleDismissed", "1"); // picking a sample on purpose means you know it's a sample
-    await loadSample(opt.value, opt.textContent);
+    await loadSample(opt.value, opt.textContent, { offerPrevious: true });
   }
   e.target.value = "";
 });
@@ -721,7 +740,7 @@ showTab(store.get("tab") || "tree");
   try {
     if (shareId) await loadShare(shareId, { preferHash: true });
     else if (current) await loadText(current, working.get("source") || "Your export", { remember: false, preferHash: true });
-    else await loadSample("space-age-2.0", "Space Age (2.0)");
+    else await loadSample("space-age-2.0", "Space Age (2.0)", { preferHash: true });
   } catch (err) {
     showError(err.message);
     await loadSample("space-age-2.0", "Space Age (2.0)");
