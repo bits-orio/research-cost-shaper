@@ -87,13 +87,14 @@ PUBLISH_FIELDS=()
 if [[ "$MOD_EXISTS" -eq 0 ]]; then
     META=tools/portal_meta.json
     if [[ -f "$META" ]]; then
-        for field in title summary category license homepage source_url; do
+        # The publish endpoint accepts only these four (plus the file); it
+        # rejects title, summary, homepage and tags as unknown fields. Title and
+        # summary come from info.json; homepage and tags are set by the page
+        # sync that runs right after the first upload.
+        for field in category license source_url; do
             value=$(jq -r --arg f "$field" '.[$f] // empty' "$META")
             [[ -n "$value" ]] && PUBLISH_FIELDS+=(--form-string "${field}=${value}")
         done
-        while read -r tag; do
-            [[ -n "$tag" ]] && PUBLISH_FIELDS+=(--form-string "tags=${tag}")
-        done < <(jq -r '.tags[]? // empty' "$META")
     fi
     [[ -f docs/portal.md ]] && PUBLISH_FIELDS+=(-F "description=<docs/portal.md")
 fi
