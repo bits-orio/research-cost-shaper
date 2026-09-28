@@ -5,38 +5,34 @@ with Multi-Team Support, Land Title Registry and Open Discord Bridge:
 grey subtitle in caps, at the same heights so the cards line up in a row on
 the author page.
 
-The letters wear the first three science pack colours, the ones every curve
-starts from:
+Three layers, back to front:
 
-    R   automation   red
-    C   logistic     green
-    S   chemical     blue
+  - A research lab, as flat art. Factorio's lab is the top half of a pentakis
+    dodecahedron (a dodecahedron with a low five-sided pyramid on each face,
+    60 triangles), glowing blue while it researches, on a dark base ring. It
+    is not the game's sprite: the solid is built here, apexes pushed out to
+    the sphere so it reads as a geodesic dome, stood on one apex, cut at the
+    equator and viewed from a little above. Each panel gets one of a few flat
+    blues from a single light, and the base ring's indicator lights wear the
+    science pack colours.
+  - The cost curve, rising across the lab in the companion page's orange.
+  - The mark, RCS, in the first three science pack colours, and the subtitle.
+    As on LTR's card, a centred black halo separates them from what is under
+    them without changing the letters themselves.
 
-Behind them sits what the mod is about: a cost curve rising across a faint
-log-scale grid, in the companion page's orange. As on LTR's card, a centred
-black halo separates the letters from what is under them without changing
-the letters themselves.
-
-In the top-left corner, where the curve leaves room, sits the companion
-page's brand mark: the lab flask on its orange tile. It is read from the
-i-brand symbol in site/index.html, so the page, its favicon and this card
-share one drawing. ImageMagick rasterizes the flask (it handles the arcs but
-not SVG gradients); the tile and its gradient are drawn here.
-
-Drawn at SUPERSAMPLE times the size and scaled down, so the curve stays smooth.
+Drawn at SUPERSAMPLE times the size and scaled down, so edges stay smooth.
 
 Run from the repo root:  python3 tools/gen_thumbnail.py
 """
 
-import io
-import re
-import subprocess
+import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 SIZE = 512
 SUPERSAMPLE = 2
+S = SIZE * SUPERSAMPLE
 BG = (43, 43, 43)
 FRAME = (64, 64, 64)
 FRAME_INSET = 14
@@ -59,47 +55,158 @@ FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 LETTER_SIZE = 185
 SUBTITLE_SIZE = 44
 
-GRID = (58, 58, 58)
+GRID = (52, 52, 52)
 CURVE = (240, 138, 62)
 CURVE_WIDTH = 7
 # The curve: low and flat on the left, climbing to the top right, as a
 # "hard late game" curve looks on the page's log scale. Normalised 0..1.
 CURVE_POINTS = [(0.0, 0.16), (0.3, 0.26), (0.55, 0.40), (0.78, 0.62), (1.0, 0.92)]
 
+# The lab, in card pixels: centre of the base ring, radius, how far the viewer
+# looks down on it, and how far it is turned about its vertical axis.
+LAB_CENTRE = (256, 330)
+LAB_RADIUS = 184
+LAB_TILT = math.radians(20)
+LAB_YAW = math.radians(18)
+# Flat glass tones, darkest to brightest: a lab mid-research.
+GLASS = ((16, 40, 80), (22, 60, 116), (32, 88, 158), (58, 128, 200))
+STRUT = (178, 168, 150)
+HUB = (214, 204, 184)
+BASE = (46, 50, 56)
+BASE_EDGE = (74, 80, 88)
+GLOW = (40, 110, 220)
+LIGHT = (-0.45, 0.65, 0.6)
+PACK_LIGHTS = ((232, 72, 64), (70, 186, 86), (70, 150, 232), (160, 90, 210), (230, 190, 50))
 
-# The brand mark: size and top-left corner, inside the frame.
-MARK_SIZE = 84
-MARK_POS = (36, 36)
+PHI = (1 + 5 ** 0.5) / 2
 
 
-def brand_mark(root):
-    """The page's i-brand symbol as an RGBA tile, MARK_SIZE square."""
-    html = (root / "site/index.html").read_text()
-    symbol = re.search(r'<symbol id="i-brand" viewBox="0 0 32 32">(.*?)</symbol>', html, re.S).group(1)
-    outline, liquid = re.findall(r'<path d="([^"]+)"', symbol)
-    stops = re.search(r'<linearGradient id="brand-fill"(.*?)</linearGradient>', html, re.S).group(1)
-    top, bottom = (tuple(int(c[i:i + 2], 16) for i in (1, 3, 5)) for c in re.findall(r'stop-color="(#[0-9a-fA-F]{6})"', stops))
+def normalise(v):
+    n = math.sqrt(sum(c * c for c in v))
+    return tuple(c / n for c in v)
 
-    big = MARK_SIZE * 4
-    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="{big}" height="{big}">'
-           f'<path d="{outline}" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
-           f'<path d="{liquid}" fill="#fff"/></svg>')
-    png = subprocess.run(["convert", "-background", "none", "svg:-", "png:-"], input=svg.encode(),
-                         capture_output=True, check=True).stdout
-    flask = Image.open(io.BytesIO(png)).convert("RGBA").resize((big, big), Image.Resampling.LANCZOS)
 
-    # Diagonal gradient, top-left to bottom-right, as the SVG's x1=0 y1=0 x2=1 y2=1.
-    tile = Image.new("RGBA", (big, big))
-    px = tile.load()
-    for y in range(big):
-        for x in range(big):
-            t = (x + y) / (2 * (big - 1))
-            px[x, y] = tuple(round(top[i] + (bottom[i] - top[i]) * t) for i in range(3)) + (255,)
-    mask = Image.new("L", (big, big), 0)
-    ImageDraw.Draw(mask).rounded_rectangle([0, 0, big - 1, big - 1], radius=big * 7 / 32, fill=255)
-    tile.putalpha(mask)
-    tile.alpha_composite(flask)
-    return tile.resize((MARK_SIZE, MARK_SIZE), Image.Resampling.LANCZOS)
+def dot(a, b):
+    return sum(x * y for x, y in zip(a, b))
+
+
+def pentakis_triangles():
+    """The 60 faces of a pentakis dodecahedron, every vertex on the unit sphere.
+
+    Dodecahedron corners, plus one apex over each of its 12 pentagons (the
+    pentagon centres are the icosahedron's vertices). Each pentagon becomes
+    five triangles fanned from its apex.
+    """
+    corners = [(x, y, z) for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)]
+    for a in (-1, 1):
+        for b in (-1, 1):
+            corners += [(0, a / PHI, b * PHI), (a / PHI, b * PHI, 0), (a * PHI, 0, b / PHI)]
+    corners = [normalise(c) for c in corners]
+    apexes = []
+    for a in (-1, 1):
+        for b in (-1, 1):
+            apexes += [(0, a * PHI, b), (a * PHI, b, 0), (a, 0, b * PHI)]
+    apexes = [normalise(c) for c in apexes]
+
+    tris = []
+    for apex in apexes:
+        ring = sorted(corners, key=lambda c: -dot(c, apex))[:5]
+        # Order the pentagon's corners around the apex.
+        ref = normalise(tuple(ring[0][i] - apex[i] * dot(ring[0], apex) for i in range(3)))
+        side = normalise((apex[1] * ref[2] - apex[2] * ref[1], apex[2] * ref[0] - apex[0] * ref[2], apex[0] * ref[1] - apex[1] * ref[0]))
+        ring.sort(key=lambda c: math.atan2(dot(c, side), dot(c, ref)))
+        for i in range(5):
+            tris.append((apex, ring[i], ring[(i + 1) % 5]))
+    return tris
+
+
+def orient(p):
+    """Stand the solid on an apex: turn (0, PHI, 1) to straight up, then yaw."""
+    t = math.atan2(1, PHI)
+    x, y, z = p
+    y, z = y * math.cos(t) + z * math.sin(t), -y * math.sin(t) + z * math.cos(t)
+    x, z = x * math.cos(LAB_YAW) + z * math.sin(LAB_YAW), -x * math.sin(LAB_YAW) + z * math.cos(LAB_YAW)
+    return (x, y, z)
+
+
+def clip_above_equator(poly):
+    """Sutherland-Hodgman against y >= 0: the dome is the solid's top half."""
+    out = []
+    for i, cur in enumerate(poly):
+        prev = poly[i - 1]
+        if cur[1] >= 0:
+            if prev[1] < 0:
+                t = prev[1] / (prev[1] - cur[1])
+                out.append(tuple(prev[k] + (cur[k] - prev[k]) * t for k in range(3)))
+            out.append(cur)
+        elif prev[1] >= 0:
+            t = prev[1] / (prev[1] - cur[1])
+            out.append(tuple(prev[k] + (cur[k] - prev[k]) * t for k in range(3)))
+    return out
+
+
+def project(p):
+    """Card coordinates (supersampled) for a point, seen from a little above."""
+    x, y, z = p
+    cx, cy = LAB_CENTRE
+    r = LAB_RADIUS * SUPERSAMPLE
+    return (cx * SUPERSAMPLE + r * x, cy * SUPERSAMPLE - r * (y * math.cos(LAB_TILT) - z * math.sin(LAB_TILT)))
+
+
+def draw_lab(img):
+    d = ImageDraw.Draw(img)
+    view = (0, math.sin(LAB_TILT), math.cos(LAB_TILT))
+    light = normalise(LIGHT)
+    cx, cy = (c * SUPERSAMPLE for c in LAB_CENTRE)
+    r = LAB_RADIUS * SUPERSAMPLE
+
+    # Glow: the blue a working lab throws on the ground around it.
+    glow = Image.new("L", img.size, 0)
+    ImageDraw.Draw(glow).ellipse([cx - r * 1.12, cy - r * 1.02, cx + r * 1.12, cy + r * 0.34], fill=150)
+    glow = glow.filter(ImageFilter.GaussianBlur(28 * SUPERSAMPLE))
+    img.paste(Image.new("RGB", img.size, GLOW), (0, 0), glow)
+
+    # Base ring: the front half of the equator, dropped into a band, with
+    # socket lights in the science pack colours.
+    band = 16 * SUPERSAMPLE
+    equator = lambda deg: project((math.sin(math.radians(deg)), 0, math.cos(math.radians(deg))))
+    front = [equator(t) for t in range(-90, 91, 3)]
+    d.polygon(front + [(x, y + band) for x, y in reversed(front)], fill=BASE)
+    d.line(front, fill=BASE_EDGE, width=3 * SUPERSAMPLE)
+    for k, t in enumerate(range(-75, 76, 15)):
+        x, y = equator(t)
+        w = 9 * SUPERSAMPLE * math.cos(math.radians(t)) + 2 * SUPERSAMPLE
+        top = y + 3.5 * SUPERSAMPLE
+        d.rounded_rectangle([x - w, top, x + w, top + 9 * SUPERSAMPLE], radius=2 * SUPERSAMPLE, fill=(28, 30, 34))
+        lr = 3 * SUPERSAMPLE
+        mid = top + 4.5 * SUPERSAMPLE
+        d.ellipse([x - lr, mid - lr, x + lr, mid + lr], fill=PACK_LIGHTS[k % len(PACK_LIGHTS)])
+
+    # Glass panels, flat-shaded back to front, then the struts over them.
+    faces = []
+    for tri in pentakis_triangles():
+        poly = clip_above_equator([orient(v) for v in tri])
+        if len(poly) < 3:
+            continue
+        normal = normalise(tuple(sum(v[i] for v in (orient(u) for u in tri)) for i in range(3)))
+        facing = dot(normal, view)
+        if facing <= 0:
+            continue
+        shade = max(0.0, dot(normal, light))
+        tone = GLASS[min(len(GLASS) - 1, int(shade * len(GLASS)))]
+        faces.append((facing, [project(p) for p in poly], tone))
+    faces.sort(key=lambda f: f[0])
+    for _, poly, tone in faces:
+        d.polygon(poly, fill=tone)
+    hubs = set()
+    for _, poly, _ in faces:
+        d.line(poly + [poly[0]], fill=STRUT, width=4 * SUPERSAMPLE, joint="curve")
+        hubs.update((round(x), round(y)) for x, y in poly)
+    hr = 3.5 * SUPERSAMPLE
+    base_y = cy
+    for x, y in hubs:
+        if y < base_y - 2 * SUPERSAMPLE:  # clipped points on the equator are not hubs
+            d.ellipse([x - hr, y - hr, x + hr, y + hr], fill=HUB)
 
 
 def smooth(points, steps=64):
@@ -119,26 +226,36 @@ def smooth(points, steps=64):
     return out
 
 
-def underlay():
-    """Grid and curve inside the frame, drawn large and scaled down."""
-    s = SIZE * SUPERSAMPLE
-    img = Image.new("RGB", (s, s), BG)
-    d = ImageDraw.Draw(img)
+def inner_box():
     lo = (FRAME_INSET + FRAME_WIDTH) * SUPERSAMPLE
-    hi = s - lo
-    span = hi - lo
+    return lo, S - lo
+
+
+def draw_grid(img):
+    d = ImageDraw.Draw(img)
+    lo, hi = inner_box()
     for i in range(1, 6):
-        v = lo + span * i / 6
+        v = lo + (hi - lo) * i / 6
         d.line([(v, lo), (v, hi)], fill=GRID, width=2 * SUPERSAMPLE)
         d.line([(lo, v), (hi, v)], fill=GRID, width=2 * SUPERSAMPLE)
+
+
+def draw_curve(img):
+    """The curve on its own layer with a soft dark halo, so it reads over the lab."""
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    lo, hi = inner_box()
+    span = hi - lo
     pad = span * 0.08
-    xy = [(lo + pad + (span - 2 * pad) * x, hi - pad - (span - 2 * pad) * y) for x, y in smooth(CURVE_POINTS)]
-    d.line(xy, fill=CURVE, width=CURVE_WIDTH * SUPERSAMPLE, joint="curve")
+    at = lambda x, y: (lo + pad + (span - 2 * pad) * x, hi - pad - (span - 2 * pad) * y)
+    d.line([at(x, y) for x, y in smooth(CURVE_POINTS)], fill=CURVE + (255,), width=CURVE_WIDTH * SUPERSAMPLE, joint="curve")
     r = CURVE_WIDTH * SUPERSAMPLE * 1.6
     for x, y in CURVE_POINTS:
-        cx, cy = lo + pad + (span - 2 * pad) * x, hi - pad - (span - 2 * pad) * y
-        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=BG, outline=CURVE, width=3 * SUPERSAMPLE)
-    return img.resize((SIZE, SIZE), Image.Resampling.LANCZOS)
+        cx, cy = at(x, y)
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=BG + (255,), outline=CURVE + (255,), width=3 * SUPERSAMPLE)
+    shadow = layer.getchannel("A").filter(ImageFilter.GaussianBlur(5 * SUPERSAMPLE)).point(lambda v: min(255, int(v * 1.3)))
+    img.paste(Image.new("RGB", img.size, HALO), (0, 0), shadow)
+    img.paste(layer, (0, 0), layer)
 
 
 def draw_letters():
@@ -161,25 +278,22 @@ def glow_for(layer):
     return halo
 
 
-def build(root):
-    img = underlay()
+def build():
+    big = Image.new("RGB", (S, S), BG)
+    draw_grid(big)
+    draw_lab(big)
+    draw_curve(big)
+    img = big.resize((SIZE, SIZE), Image.Resampling.LANCZOS)
+
     d = ImageDraw.Draw(img)
     far = SIZE - 1 - FRAME_INSET
     d.rectangle([FRAME_INSET, FRAME_INSET, far, far], outline=FRAME, width=FRAME_WIDTH)
-
-    mark = brand_mark(root)
-    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    layer.paste(mark, MARK_POS, mark)
-    img.paste(glow_for(layer), (0, 0), glow_for(layer))
-    img.paste(layer, (0, 0), layer)
 
     layer, (left, top, right, bottom) = draw_letters()
     offset = (round(SIZE / 2 - (left + right) / 2), round(LETTERS_CENTRE_Y - (top + bottom) / 2))
     img.paste(glow_for(layer), offset, glow_for(layer))
     img.paste(layer, offset, layer)
 
-    # The subtitle gets the same halo, so the curve passing behind it
-    # doesn't cut through the letters.
     sub = Image.new("RGBA", img.size, (0, 0, 0, 0))
     ImageDraw.Draw(sub).text((SIZE / 2, SUBTITLE_CENTRE_Y), SUBTITLE,
                              font=ImageFont.truetype(FONT, SUBTITLE_SIZE), fill=SUBTITLE_FILL, anchor="mm")
@@ -191,7 +305,7 @@ def build(root):
 def main():
     root = Path(__file__).resolve().parent.parent
     out = root / "thumbnail.png"
-    build(root).save(out, optimize=True)
+    build().save(out, optimize=True)
     print(f"wrote {out}")
 
 
