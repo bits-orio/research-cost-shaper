@@ -14,11 +14,11 @@ Three layers, back to front, inside the frame:
     flat blue panels lit from one side, warm struts, lighter hubs where they
     meet. Drawn from geometry, not from the game's sprite. Like LTR's stripes,
     the texture stays inside the frame.
-  - The cost curve, rising across it in the companion page's orange, with a
-    soft dark edge so it reads over the glass.
   - The mark, RCS, in the first three science pack colours, and the subtitle.
     As on LTR's card, a centred black halo separates them from what is under
     them without changing the letters themselves.
+  - The cost curve on top of everything, rising across the mark in the
+    companion page's orange, with a soft dark edge so it reads over both.
 
 Drawn at SUPERSAMPLE times the size and scaled down, so edges stay smooth.
 
@@ -190,9 +190,10 @@ def inner_box():
     return lo, S - lo
 
 
-def draw_curve(img):
-    """The curve on its own layer with a soft dark halo, so it reads over the lab."""
-    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+def curve_layer():
+    """The curve and its soft dark edge as one transparent layer, card size, so
+    it can go on top of everything else."""
+    layer = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
     lo, hi = inner_box()
     span = hi - lo
@@ -204,8 +205,10 @@ def draw_curve(img):
         cx, cy = at(x, y)
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=INK + (255,), outline=CURVE + (255,), width=4 * SUPERSAMPLE)
     shadow = layer.getchannel("A").filter(ImageFilter.GaussianBlur(6 * SUPERSAMPLE)).point(lambda v: min(255, int(v * 2.2)))
-    img.paste(Image.new("RGB", img.size, HALO), (0, 0), shadow)
-    img.paste(layer, (0, 0), layer)
+    out = Image.new("RGBA", (S, S), HALO + (0,))
+    out.putalpha(shadow)
+    out.alpha_composite(layer)
+    return out.resize((SIZE, SIZE), Image.Resampling.LANCZOS)
 
 
 def draw_letters():
@@ -238,7 +241,6 @@ def build():
     inside = Image.new("L", (S, S), 0)
     ImageDraw.Draw(inside).rectangle([lo, lo, hi, hi], fill=255)
     big.paste(facets, (0, 0), inside)
-    draw_curve(big)
     img = big.resize((SIZE, SIZE), Image.Resampling.LANCZOS)
 
     d = ImageDraw.Draw(img)
@@ -266,6 +268,10 @@ def build():
                              stroke_width=SUBTITLE_OUTLINE, stroke_fill=INK)
     img.paste(glow_for(sub), (0, 0), glow_for(sub))
     img.paste(sub, (0, 0), sub)
+
+    # The curve goes last, over the mark and the subtitle.
+    curve = curve_layer()
+    img.paste(curve, (0, 0), curve)
     return img
 
 
