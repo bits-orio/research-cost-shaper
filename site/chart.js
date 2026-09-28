@@ -33,12 +33,33 @@ export function createChart(svg, tooltip, { onChange, onPreview, packColor, pack
   let range = { lo: 0.1, hi: 100 };
   let dragging = null;
   let moved = false;
+  let dragBase = null; // the range when the drag began; the pointer maps against it
+  let wheelPoint = null; // the point a burst of wheel notches is scaling
+  let wheelTimer = null;
   let pulse = false; // one-shot: the next draw animates the curve to confirm a change
 
   const X = (x) => M.l + x * PW;
   const Y = (m) => M.t + PH - ((Math.log10(m) - Math.log10(range.lo)) / (Math.log10(range.hi) - Math.log10(range.lo))) * PH;
   const invX = (px) => (px - M.l) / PW;
-  const invY = (py) => 10 ** (Math.log10(range.lo) + ((M.t + PH - py) / PH) * (Math.log10(range.hi) - Math.log10(range.lo)));
+  const invYIn = (r, py) => 10 ** (Math.log10(r.lo) + ((M.t + PH - py) / PH) * (Math.log10(r.hi) - Math.log10(r.lo)));
+  const invY = (py) => invYIn(range, py);
+
+  // Past the chart's top or bottom edge a drag keeps going: every DECADE
+  // units beyond it is another factor of ten, so 10k or 100k is one smooth
+  // pull instead of drag, release, repeat.
+  const DECADE = 70;
+  const MIN_MULT = 0.001;
+  const MAX_MULT = 1e7;
+  const clampMult = (m) => Math.min(MAX_MULT, Math.max(MIN_MULT, m));
+  function dragValue(py) {
+    if (py < M.t) return clampMult(dragBase.hi * 10 ** ((M.t - py) / DECADE));
+    if (py > M.t + PH) return clampMult(dragBase.lo / 10 ** ((py - M.t - PH) / DECADE));
+    return invYIn(dragBase, py);
+  }
+  // Stretch the visible range just enough to keep m on the chart.
+  function widenFor(m, base) {
+    range = { lo: Math.min(base.lo, niceStep(m / 1.25, -1)), hi: Math.max(base.hi, niceStep(m * 1.25, 1)) };
+  }
 
   function fitRange() {
     const f = window.RcsCurve.build(spec);
@@ -69,12 +90,15 @@ export function createChart(svg, tooltip, { onChange, onPreview, packColor, pack
 
     // Grid: decades and 2/5 steps on y, tenths on x.
     const grid = el("g", { class: "grid" }, svg);
+    // Over a wide range (a curve pulled up to 10k or more) the 2 and 5 steps
+    // keep their gridlines but lose their labels, so the axis stays legible.
+    const wide = Math.log10(range.hi / range.lo) > 3;
     for (let d = Math.floor(Math.log10(range.lo)); d <= Math.ceil(Math.log10(range.hi)); d++) {
       for (const k of [1, 2, 5]) {
         const m = 10 ** d * k;
         if (m < range.lo * (1 - 1e-9) || m > range.hi * (1 + 1e-9)) continue;
         el("line", { x1: M.l, x2: M.l + PW, y1: Y(m), y2: Y(m), class: k === 1 ? "major" : "minor" }, grid);
-        el("text", { x: M.l - 8, y: Y(m) + 4, class: "tick y" }, grid).textContent = `×${fmtMult(m)}`;
+        if (k === 1 || !wide) el("text", { x: M.l - 8, y: Y(m) + 4, class: "tick y" }, grid).textContent = `×${fmtMult(m)}`;
       }
     }
     for (let i = 0; i <= 10; i++) {
@@ -149,7 +173,7 @@ export function createChart(svg, tooltip, { onChange, onPreview, packColor, pack
 
     // Control points.
     spec.points.forEach((p, i) => {
-      const g = el("g", { class: "handle", tabindex: 0 }, svg);
+      const g = el("g", { class: "handle", tabindex: 0, "data-i": i }, svg);
       el("circle", { cx: X(p.x), cy: Y(p.m), r: 14, class: "hit" }, g);
       el("circle", { cx: X(p.x), cy: Y(p.m), r: 6, class: "dot" }, g);
       const edge = X(p.x) < M.l + 40 ? "start" : X(p.x) > W - M.r - 40 ? "end" : "middle";
@@ -159,6 +183,7 @@ export function createChart(svg, tooltip, { onChange, onPreview, packColor, pack
         e.preventDefault();
         dragging = i;
         moved = false;
+        dragBase = { ...range };
         hideTip();
       });
       g.addEventListener("dblclick", (e) => {
@@ -177,13 +202,18 @@ export function createChart(svg, tooltip, { onChange, onPreview, packColor, pack
   // Drags are tracked on the window: every move redraws, replacing the handle.
   window.addEventListener("pointermove", (e) => {
     if (dragging === null) return;
+    // Capture once the point really moves, so the drag keeps tracking outside
+    // the chart and the window; a plain click stays uncaptured so a
+    // double-click still reaches the point.
+    if (!moved) { try { svg.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ } }
     moved = true;
     const p = spec.points[dragging];
     const q = point(e);
     const left = dragging > 0 ? spec.points[dragging - 1].x + 0.01 : 0;
     const right = dragging < spec.points.length - 1 ? spec.points[dragging + 1].x - 0.01 : 1;
     p.x = roundX(Math.min(right, Math.max(left, invX(q.x))));
-    p.m = round(Math.min(range.hi, Math.max(range.lo, invY(q.y))));
+    p.m = round(dragValue(q.y));
+    widenFor(p.m, dragBase);
     // Only the chart redraws while dragging; costs are recalculated on release.
     draw();
     onPreview?.(structuredClone(spec));
@@ -191,11 +221,31 @@ export function createChart(svg, tooltip, { onChange, onPreview, packColor, pack
   window.addEventListener("pointerup", () => {
     if (dragging === null) return;
     dragging = null;
+    dragBase = null;
     if (!moved) return; // a plain click; keep the element so dblclick can land
     fitRange();
     draw();
     emit();
   });
+
+  // Scroll over a point to scale it: x1.25 per notch up, /1.25 down. A burst of
+  // notches keeps working on the same point even if it slides out from under
+  // the pointer, and costs are recalculated once the scrolling stops.
+  svg.addEventListener("wheel", (e) => {
+    const handle = e.target.closest?.(".handle");
+    const i = handle ? Number(handle.dataset.i) : wheelPoint;
+    if (i === null || i === undefined || !spec.points[i] || dragging !== null) return;
+    e.preventDefault();
+    wheelPoint = i;
+    const p = spec.points[i];
+    p.m = round(clampMult(p.m * (e.deltaY < 0 ? 1.25 : 0.8)));
+    widenFor(p.m, range);
+    hideTip();
+    draw();
+    onPreview?.(structuredClone(spec));
+    clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(() => { wheelPoint = null; fitRange(); draw(); emit(); }, 350);
+  }, { passive: false });
 
   function showTip(e, html) {
     tooltip.innerHTML = html;
