@@ -37,11 +37,17 @@ BG = (43, 43, 43)
 FRAME = (64, 64, 64)
 FRAME_INSET = 14
 FRAME_WIDTH = 8
-SUBTITLE_FILL = (154, 160, 166)
+SUBTITLE_FILL = (222, 226, 232)
 
 HALO = (0, 0, 0)
-HALO_RADIUS = 8
-HALO_STRENGTH = 1.5
+HALO_RADIUS = 10
+HALO_STRENGTH = 2.0
+# Over the busy glass the halo alone isn't enough: a thin dark outline hugs
+# the letters and the subtitle, and a soft dark band sits behind the subtitle.
+INK = (14, 16, 22)
+LETTER_OUTLINE = 4
+SUBTITLE_OUTLINE = 3
+SUBTITLE_BAND = (360, 490, 150)  # top, bottom (the frame), peak darkness (0-255)
 
 LETTERS = "RCS"
 # Science pack colours from site/app.js, lifted a little for a dark ground.
@@ -55,8 +61,8 @@ FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 LETTER_SIZE = 185
 SUBTITLE_SIZE = 44
 
-CURVE = (240, 138, 62)
-CURVE_WIDTH = 7
+CURVE = (255, 152, 66)
+CURVE_WIDTH = 8
 # The curve: low and flat on the left, climbing to the top right, as a
 # "hard late game" curve looks on the page's log scale. Normalised 0..1.
 CURVE_POINTS = [(0.0, 0.16), (0.3, 0.26), (0.55, 0.40), (0.78, 0.62), (1.0, 0.92)]
@@ -196,8 +202,8 @@ def draw_curve(img):
     r = CURVE_WIDTH * SUPERSAMPLE * 1.6
     for x, y in CURVE_POINTS:
         cx, cy = at(x, y)
-        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=BG + (255,), outline=CURVE + (255,), width=3 * SUPERSAMPLE)
-    shadow = layer.getchannel("A").filter(ImageFilter.GaussianBlur(5 * SUPERSAMPLE)).point(lambda v: min(255, int(v * 1.3)))
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=INK + (255,), outline=CURVE + (255,), width=4 * SUPERSAMPLE)
+    shadow = layer.getchannel("A").filter(ImageFilter.GaussianBlur(6 * SUPERSAMPLE)).point(lambda v: min(255, int(v * 2.2)))
     img.paste(Image.new("RGB", img.size, HALO), (0, 0), shadow)
     img.paste(layer, (0, 0), layer)
 
@@ -209,7 +215,7 @@ def draw_letters():
     font = ImageFont.truetype(FONT, LETTER_SIZE)
     x = SIZE / 2
     for ch, color in zip(LETTERS, LETTER_COLORS):
-        d.text((x, SIZE / 2), ch, font=font, fill=color)
+        d.text((x, SIZE / 2), ch, font=font, fill=color, stroke_width=LETTER_OUTLINE, stroke_fill=INK)
         x += d.textlength(ch, font=font)
     return layer, layer.getbbox()
 
@@ -244,9 +250,20 @@ def build():
     img.paste(glow_for(layer), offset, glow_for(layer))
     img.paste(layer, offset, layer)
 
+    # A dark band fading in behind the subtitle, inside the frame only.
+    top, bottom, peak = SUBTITLE_BAND
+    lo, hi = FRAME_INSET + FRAME_WIDTH, SIZE - FRAME_INSET - FRAME_WIDTH
+    band = Image.new("L", img.size, 0)
+    bd = ImageDraw.Draw(band)
+    for y in range(top, min(bottom, hi)):
+        t = (y - top) / (bottom - top)
+        bd.line([(lo, y), (hi, y)], fill=round(peak * min(1.0, t * 2.2)))
+    img.paste(Image.new("RGB", img.size, INK), (0, 0), band)
+
     sub = Image.new("RGBA", img.size, (0, 0, 0, 0))
     ImageDraw.Draw(sub).text((SIZE / 2, SUBTITLE_CENTRE_Y), SUBTITLE,
-                             font=ImageFont.truetype(FONT, SUBTITLE_SIZE), fill=SUBTITLE_FILL, anchor="mm")
+                             font=ImageFont.truetype(FONT, SUBTITLE_SIZE), fill=SUBTITLE_FILL, anchor="mm",
+                             stroke_width=SUBTITLE_OUTLINE, stroke_fill=INK)
     img.paste(glow_for(sub), (0, 0), glow_for(sub))
     img.paste(sub, (0, 0), sub)
     return img
