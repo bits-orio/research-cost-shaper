@@ -62,7 +62,8 @@ LETTER_SIZE = 185
 SUBTITLE_SIZE = 44
 
 CURVE = (255, 152, 66)
-CURVE_WIDTH = 8
+CURVE_WIDTH = 6.5
+CURVE_DOT_RADIUS = 12.8  # the control-point rings, independent of the line
 # The curve: low and flat on the left, climbing to the top right, as a
 # "hard late game" curve looks on the page's log scale. Normalised 0..1.
 CURVE_POINTS = [(0.0, 0.16), (0.3, 0.26), (0.55, 0.40), (0.78, 0.62), (1.0, 0.92)]
@@ -199,8 +200,8 @@ def curve_layer():
     span = hi - lo
     pad = span * 0.08
     at = lambda x, y: (lo + pad + (span - 2 * pad) * x, hi - pad - (span - 2 * pad) * y)
-    d.line([at(x, y) for x, y in smooth(CURVE_POINTS)], fill=CURVE + (255,), width=CURVE_WIDTH * SUPERSAMPLE, joint="curve")
-    r = CURVE_WIDTH * SUPERSAMPLE * 1.6
+    d.line([at(x, y) for x, y in smooth(CURVE_POINTS)], fill=CURVE + (255,), width=round(CURVE_WIDTH * SUPERSAMPLE), joint="curve")
+    r = CURVE_DOT_RADIUS * SUPERSAMPLE
     for x, y in CURVE_POINTS:
         cx, cy = at(x, y)
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=INK + (255,), outline=CURVE + (255,), width=4 * SUPERSAMPLE)
