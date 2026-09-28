@@ -5,17 +5,17 @@ with Multi-Team Support, Land Title Registry and Open Discord Bridge:
 grey subtitle in caps, at the same heights so the cards line up in a row on
 the author page.
 
-Three layers, back to front:
+Three layers, back to front, inside the frame:
 
-  - A research lab, as flat art. Factorio's lab is the top half of a pentakis
-    dodecahedron (a dodecahedron with a low five-sided pyramid on each face,
-    60 triangles), glowing blue while it researches, on a dark base ring. It
-    is not the game's sprite: the solid is built here, apexes pushed out to
-    the sphere so it reads as a geodesic dome, stood on one apex, cut at the
-    equator and viewed from a little above. Each panel gets one of a few flat
-    blues from a single light, and the base ring's indicator lights wear the
-    science pack colours.
-  - The cost curve, rising across the lab in the companion page's orange.
+  - A research lab's glass seen up close. Factorio's lab is a dome made from a
+    pentakis dodecahedron (a dodecahedron with a low five-sided pyramid on each
+    face, 60 triangles). The same solid is built here, apexes pushed out to the
+    sphere, and projected so large that its front panels tile the whole card:
+    flat blue panels lit from one side, warm struts, lighter hubs where they
+    meet. Drawn from geometry, not from the game's sprite. Like LTR's stripes,
+    the texture stays inside the frame.
+  - The cost curve, rising across it in the companion page's orange, with a
+    soft dark edge so it reads over the glass.
   - The mark, RCS, in the first three science pack colours, and the subtitle.
     As on LTR's card, a centred black halo separates them from what is under
     them without changing the letters themselves.
@@ -55,28 +55,27 @@ FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 LETTER_SIZE = 185
 SUBTITLE_SIZE = 44
 
-GRID = (52, 52, 52)
 CURVE = (240, 138, 62)
 CURVE_WIDTH = 7
 # The curve: low and flat on the left, climbing to the top right, as a
 # "hard late game" curve looks on the page's log scale. Normalised 0..1.
 CURVE_POINTS = [(0.0, 0.16), (0.3, 0.26), (0.55, 0.40), (0.78, 0.62), (1.0, 0.92)]
 
-# The lab, in card pixels: centre of the base ring, radius, how far the viewer
-# looks down on it, and how far it is turned about its vertical axis.
-LAB_CENTRE = (256, 330)
-LAB_RADIUS = 184
-LAB_TILT = math.radians(20)
-LAB_YAW = math.radians(18)
-# Flat glass tones, darkest to brightest: a lab mid-research.
-GLASS = ((16, 40, 80), (22, 60, 116), (32, 88, 158), (58, 128, 200))
-STRUT = (178, 168, 150)
-HUB = (214, 204, 184)
-BASE = (46, 50, 56)
-BASE_EDGE = (74, 80, 88)
-GLOW = (40, 110, 220)
-LIGHT = (-0.45, 0.65, 0.6)
-PACK_LIGHTS = ((232, 72, 64), (70, 186, 86), (70, 150, 232), (160, 90, 210), (230, 190, 50))
+# The background: a lab's glass seen up close. The same pentakis dodecahedron
+# the lab is built from, projected so large that its front panels tile the
+# whole card. FACET_RADIUS is the sphere's radius in card pixels: below about
+# 360 the panels that would cover the corners face away and leave gaps.
+# PITCH and YAW turn the solid to choose which panels face the viewer.
+FACET_RADIUS = 360
+FACET_CENTRE = (256, 256)
+FACET_PITCH = math.radians(12)
+FACET_YAW = math.radians(18)
+# Flat glass tones, darkest to brightest: a lab mid-research, kept dark
+# enough to sit behind the mark.
+GLASS = ((16, 38, 74), (20, 52, 100), (28, 72, 132), (44, 102, 172))
+STRUT = (150, 142, 128)
+HUB = (196, 186, 166)
+LIGHT = (-0.5, 0.6, 0.62)
 
 PHI = (1 + 5 ** 0.5) / 2
 
@@ -120,93 +119,47 @@ def pentakis_triangles():
     return tris
 
 
-def orient(p):
-    """Stand the solid on an apex: turn (0, PHI, 1) to straight up, then yaw."""
-    t = math.atan2(1, PHI)
+def turn(p):
+    """Pitch then yaw the solid, choosing which panels face the viewer (+z)."""
     x, y, z = p
-    y, z = y * math.cos(t) + z * math.sin(t), -y * math.sin(t) + z * math.cos(t)
-    x, z = x * math.cos(LAB_YAW) + z * math.sin(LAB_YAW), -x * math.sin(LAB_YAW) + z * math.cos(LAB_YAW)
+    c, s_ = math.cos(FACET_PITCH), math.sin(FACET_PITCH)
+    y, z = y * c - z * s_, y * s_ + z * c
+    c, s_ = math.cos(FACET_YAW), math.sin(FACET_YAW)
+    x, z = x * c + z * s_, -x * s_ + z * c
     return (x, y, z)
 
 
-def clip_above_equator(poly):
-    """Sutherland-Hodgman against y >= 0: the dome is the solid's top half."""
-    out = []
-    for i, cur in enumerate(poly):
-        prev = poly[i - 1]
-        if cur[1] >= 0:
-            if prev[1] < 0:
-                t = prev[1] / (prev[1] - cur[1])
-                out.append(tuple(prev[k] + (cur[k] - prev[k]) * t for k in range(3)))
-            out.append(cur)
-        elif prev[1] >= 0:
-            t = prev[1] / (prev[1] - cur[1])
-            out.append(tuple(prev[k] + (cur[k] - prev[k]) * t for k in range(3)))
-    return out
-
-
 def project(p):
-    """Card coordinates (supersampled) for a point, seen from a little above."""
-    x, y, z = p
-    cx, cy = LAB_CENTRE
-    r = LAB_RADIUS * SUPERSAMPLE
-    return (cx * SUPERSAMPLE + r * x, cy * SUPERSAMPLE - r * (y * math.cos(LAB_TILT) - z * math.sin(LAB_TILT)))
+    """Card coordinates (supersampled), looking straight at the sphere."""
+    x, y, _ = p
+    cx, cy = FACET_CENTRE
+    r = FACET_RADIUS * SUPERSAMPLE
+    return (cx * SUPERSAMPLE + r * x, cy * SUPERSAMPLE - r * y)
 
 
-def draw_lab(img):
+def draw_facets(img):
+    """The front panels, flat-shaded back to front, then struts and hubs."""
     d = ImageDraw.Draw(img)
-    view = (0, math.sin(LAB_TILT), math.cos(LAB_TILT))
     light = normalise(LIGHT)
-    cx, cy = (c * SUPERSAMPLE for c in LAB_CENTRE)
-    r = LAB_RADIUS * SUPERSAMPLE
-
-    # Glow: the blue a working lab throws on the ground around it.
-    glow = Image.new("L", img.size, 0)
-    ImageDraw.Draw(glow).ellipse([cx - r * 1.12, cy - r * 1.02, cx + r * 1.12, cy + r * 0.34], fill=150)
-    glow = glow.filter(ImageFilter.GaussianBlur(28 * SUPERSAMPLE))
-    img.paste(Image.new("RGB", img.size, GLOW), (0, 0), glow)
-
-    # Base ring: the front half of the equator, dropped into a band, with
-    # socket lights in the science pack colours.
-    band = 16 * SUPERSAMPLE
-    equator = lambda deg: project((math.sin(math.radians(deg)), 0, math.cos(math.radians(deg))))
-    front = [equator(t) for t in range(-90, 91, 3)]
-    d.polygon(front + [(x, y + band) for x, y in reversed(front)], fill=BASE)
-    d.line(front, fill=BASE_EDGE, width=3 * SUPERSAMPLE)
-    for k, t in enumerate(range(-75, 76, 15)):
-        x, y = equator(t)
-        w = 9 * SUPERSAMPLE * math.cos(math.radians(t)) + 2 * SUPERSAMPLE
-        top = y + 3.5 * SUPERSAMPLE
-        d.rounded_rectangle([x - w, top, x + w, top + 9 * SUPERSAMPLE], radius=2 * SUPERSAMPLE, fill=(28, 30, 34))
-        lr = 3 * SUPERSAMPLE
-        mid = top + 4.5 * SUPERSAMPLE
-        d.ellipse([x - lr, mid - lr, x + lr, mid + lr], fill=PACK_LIGHTS[k % len(PACK_LIGHTS)])
-
-    # Glass panels, flat-shaded back to front, then the struts over them.
     faces = []
     for tri in pentakis_triangles():
-        poly = clip_above_equator([orient(v) for v in tri])
-        if len(poly) < 3:
-            continue
-        normal = normalise(tuple(sum(v[i] for v in (orient(u) for u in tri)) for i in range(3)))
-        facing = dot(normal, view)
-        if facing <= 0:
+        pts = [turn(v) for v in tri]
+        normal = normalise(tuple(sum(p[i] for p in pts) for i in range(3)))
+        if normal[2] <= 0:
             continue
         shade = max(0.0, dot(normal, light))
         tone = GLASS[min(len(GLASS) - 1, int(shade * len(GLASS)))]
-        faces.append((facing, [project(p) for p in poly], tone))
+        faces.append((normal[2], [project(p) for p in pts], tone))
     faces.sort(key=lambda f: f[0])
     for _, poly, tone in faces:
         d.polygon(poly, fill=tone)
     hubs = set()
     for _, poly, _ in faces:
-        d.line(poly + [poly[0]], fill=STRUT, width=4 * SUPERSAMPLE, joint="curve")
+        d.line(poly + [poly[0]], fill=STRUT, width=5 * SUPERSAMPLE, joint="curve")
         hubs.update((round(x), round(y)) for x, y in poly)
-    hr = 3.5 * SUPERSAMPLE
-    base_y = cy
+    hr = 5 * SUPERSAMPLE
     for x, y in hubs:
-        if y < base_y - 2 * SUPERSAMPLE:  # clipped points on the equator are not hubs
-            d.ellipse([x - hr, y - hr, x + hr, y + hr], fill=HUB)
+        d.ellipse([x - hr, y - hr, x + hr, y + hr], fill=HUB)
 
 
 def smooth(points, steps=64):
@@ -229,15 +182,6 @@ def smooth(points, steps=64):
 def inner_box():
     lo = (FRAME_INSET + FRAME_WIDTH) * SUPERSAMPLE
     return lo, S - lo
-
-
-def draw_grid(img):
-    d = ImageDraw.Draw(img)
-    lo, hi = inner_box()
-    for i in range(1, 6):
-        v = lo + (hi - lo) * i / 6
-        d.line([(v, lo), (v, hi)], fill=GRID, width=2 * SUPERSAMPLE)
-        d.line([(lo, v), (hi, v)], fill=GRID, width=2 * SUPERSAMPLE)
 
 
 def draw_curve(img):
@@ -280,8 +224,14 @@ def glow_for(layer):
 
 def build():
     big = Image.new("RGB", (S, S), BG)
-    draw_grid(big)
-    draw_lab(big)
+    # The texture stays inside the frame, as LTR's stripes do; the margin
+    # outside it is plain ground like every card in the row.
+    facets = Image.new("RGB", (S, S), BG)
+    draw_facets(facets)
+    lo, hi = inner_box()
+    inside = Image.new("L", (S, S), 0)
+    ImageDraw.Draw(inside).rectangle([lo, lo, hi, hi], fill=255)
+    big.paste(facets, (0, 0), inside)
     draw_curve(big)
     img = big.resize((SIZE, SIZE), Image.Resampling.LANCZOS)
 
