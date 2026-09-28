@@ -45,6 +45,8 @@ jobs:
           VERSION="${TAG#v}"
           echo "tag=${TAG}"         >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          # The 2.1 line: same code, minor + 1 (see tools/pack.sh).
+          echo "version21=$(awk -F. '{ printf "%d.%d.%d", $1, $2 + 1, $3 }' <<<"$VERSION")" >> "$GITHUB_OUTPUT"
           echo "Resolved tag: ${TAG} (version ${VERSION})"
 
       - name: Read mod info from info.json at that tag
@@ -68,21 +70,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # The release was built as <name>_<version>.zip by release.yml.
-          ZIP="${{ steps.info.outputs.name }}_${{ steps.tag.outputs.version }}.zip"
-          gh release download "${{ steps.tag.outputs.tag }}" \
-            --pattern "${ZIP}" \
-            --output "${ZIP}"
-          ls -la "${ZIP}"
+          # release.yml built <name>_<version>.zip (2.0) and <name>_<version21>.zip (2.1).
+          for V in "${{ steps.tag.outputs.version }}" "${{ steps.tag.outputs.version21 }}"; do
+            ZIP="${{ steps.info.outputs.name }}_${V}.zip"
+            gh release download "${{ steps.tag.outputs.tag }}" --pattern "${ZIP}" --output "${ZIP}"
+            ls -la "${ZIP}"
+          done
 
       - name: Upload to Factorio mod portal
         id: upload
         run: |
-          ZIP="${{ steps.info.outputs.name }}_${{ steps.tag.outputs.version }}.zip"
-          ./tools/upload_mod_portal.sh \
-            "${{ steps.info.outputs.name }}" \
-            "${{ steps.tag.outputs.version }}" \
-            "${ZIP}"
+          for V in "${{ steps.tag.outputs.version }}" "${{ steps.tag.outputs.version21 }}"; do
+            ./tools/upload_mod_portal.sh "${{ steps.info.outputs.name }}" "$V" "${{ steps.info.outputs.name }}_${V}.zip"
+          done
 
       # Mirror of the announce step in release.yml. When this manual workflow
       # is the one that actually puts the version on the portal (because the

@@ -7,8 +7,7 @@ each tech's new cost before you start a run.
 
 ## Status
 
-Early development, targeting Factorio 2.0 (2.1 build to follow from the same
-code). The mod applies the curve at every game launch to whatever techs your
+First release (0.1.0 for Factorio 2.0, 0.2.0 for 2.1, from the same code). The mod applies the curve at every game launch to whatever techs your
 modpack has. At each launch it also writes `rcs-report.txt` (per-tech costs) and
 `rcs-export.txt` (for the companion page) to `script-output/research-cost-shaper/`;
 `/rcs-export` shows the same export in game. When a game starts, the mod checks
@@ -64,6 +63,21 @@ tools/test.sh
 ```
 
 `./link-mod.sh` symlinks the repo into your Factorio mods folders.
+
+## Releasing
+
+One tag releases both Factorio versions. `info.json` carries the 2.0 line
+(odd minor: 0.1.x, 0.3.x, ...); `tools/pack.sh 2.1` builds the same code as
+the 2.1 line (minor + 1: 0.2.x, 0.4.x, ...).
+
+1. Bump `version` in `info.json` and add a `changelog.txt` entry.
+2. `tools/release.sh` tags `v<version>`; the release workflow builds both
+   zips, publishes them to the mod portal (2.0 first), and syncs the page
+   (`docs/portal.md`, `tools/portal_meta.json`) and gallery (`docs/gallery/`).
+3. `tools/portal_check.py` confirms the live page matches the repo.
+
+`python3 tools/gen_thumbnail.py` redraws `thumbnail.png`; `dev/run-gui.sh`
+starts an isolated graphical client for screenshots.
 
 Developed with AI coding assistants alongside human review and in-game testing.
 

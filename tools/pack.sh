@@ -7,7 +7,13 @@
 # call this script, so a zip built by hand for playtesting is byte-identical
 # in content to the one that reaches the mod portal.
 #
-# Usage:  ./tools/pack.sh            # writes ./<name>_<version>.zip
+# Usage:  ./tools/pack.sh            # writes ./<name>_<version>.zip (Factorio 2.0)
+#         ./tools/pack.sh 2.1        # the same code for Factorio 2.1
+#
+# Two release lines from one tree, as MTS numbers them: info.json carries the
+# 2.0 line (odd minor: 0.1.x, 0.3.x, ...); the 2.1 zip is the same version with
+# the minor bumped by one (0.2.x, 0.4.x, ...), declares factorio_version 2.1
+# and base >= 2.1, and its changelog headers are mapped the same way.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -25,6 +31,14 @@ command -v zip >/dev/null   || err "zip required"
 NAME=$(grep -o '"name": *"[^"]*"' info.json | head -1 | sed 's/.*"\([^"]*\)"/\1/')
 VERSION=$(grep -o '"version": *"[^"]*"' info.json | head -1 | sed 's/.*"\([^"]*\)"/\1/')
 [[ -n "$NAME" && -n "$VERSION" ]] || err "could not read name/version from info.json"
+
+TARGET="${1:-2.0}"
+bump_minor() { awk -F. '{ printf "%d.%d.%d", $1, $2 + 1, $3 }' <<<"$1"; }
+case "$TARGET" in
+    2.0) ;;
+    2.1) VERSION=$(bump_minor "$VERSION") ;;
+    *) err "unknown target '$TARGET' (expected 2.0 or 2.1)" ;;
+esac
 FOLDER="${NAME}_${VERSION}"
 
 rm -rf "build/${FOLDER}" "${FOLDER}.zip"
@@ -74,6 +88,18 @@ rsync -am --exclude='.git' \
          --exclude='*.ps1' \
          --exclude='*.exe' \
          ./ "build/${FOLDER}/"
+
+if [[ "$TARGET" == "2.1" ]]; then
+    INFO="build/${FOLDER}/info.json"
+    sed -i -E "s/\"version\": *\"[^\"]*\"/\"version\": \"${VERSION}\"/; s/\"factorio_version\": *\"[^\"]*\"/\"factorio_version\": \"2.1\"/; s/\"base >= [0-9.]+\"/\"base >= 2.1\"/" "$INFO"
+    grep -q "\"version\": \"${VERSION}\"" "$INFO" && grep -q '"factorio_version": "2.1"' "$INFO" \
+        || err "could not retarget info.json to 2.1"
+    CHANGELOG="build/${FOLDER}/changelog.txt"
+    if [[ -f "$CHANGELOG" ]]; then
+        awk -F. '/^Version: / { split($0, v, " "); split(v[2], n, "."); printf "Version: %d.%d.%d\n", n[1], n[2] + 1, n[3]; next } { print }' \
+            "$CHANGELOG" > "$CHANGELOG.new" && mv "$CHANGELOG.new" "$CHANGELOG"
+    fi
+fi
 
 ( cd build && zip -qr "../${FOLDER}.zip" "${FOLDER}" )
 
