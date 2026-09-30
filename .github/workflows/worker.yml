@@ -28,6 +28,9 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
+          # The action's default (3.90.0) ignores [[ratelimits]] and would
+          # deploy without UPLOAD_LIMIT.
+          wranglerVersion: "4.144.0"
 
       - name: Skip deploy (no Cloudflare token configured)
         if: env.HAS_TOKEN != 'true'
