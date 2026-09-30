@@ -208,3 +208,59 @@ test("GET / redirects to PAGE_URL", async () => {
   assert.equal(res.status, 302);
   assert.equal(res.headers.get("Location"), PAGE_URL);
 });
+
+// Stands in for the mod portal: known mods answer, anything else is a 404.
+function withPortal(mods, fn) {
+  const real = globalThis.fetch;
+  const asked = [];
+  globalThis.fetch = async (url) => {
+    asked.push(String(url));
+    const name = decodeURIComponent(String(url).split("/api/mods/")[1]);
+    return name in mods ? new Response(JSON.stringify(mods[name]), { status: 200 }) : new Response("{}", { status: 404 });
+  };
+  return fn(asked).finally(() => { globalThis.fetch = real; });
+}
+
+test("GET /api/mods returns title, summary and an absolute thumbnail per mod", () =>
+  withPortal({
+    "aai-loaders": { title: "AAI Loaders", owner: "Earendel", summary: "Loaders.", downloads_count: 5, thumbnail: "/assets/abc.thumb.png" },
+    "Squeak Through": { title: "Squeak Through", owner: "Supercheese", summary: "Walk.", downloads_count: 9, thumbnail: "/assets/.thumb.png" },
+  }, async (asked) => {
+    const res = await worker.fetch(new Request("https://x/api/mods?name=aai-loaders&name=Squeak%20Through&name=private-mod"), makeEnv());
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("Access-Control-Allow-Origin"), "*");
+    const { mods } = await res.json();
+    assert.deepEqual(mods["aai-loaders"], {
+      title: "AAI Loaders", owner: "Earendel", summary: "Loaders.", downloads: 5, thumbnail: "https://assets-mod.factorio.com/assets/abc.thumb.png",
+    });
+    assert.equal(mods["Squeak Through"].thumbnail, null, "the portal's placeholder path means no thumbnail");
+    assert.equal(mods["private-mod"], null, "a mod the portal doesn't know is null, not an error");
+    assert.equal(res.headers.get("Cache-Control"), "public, max-age=86400");
+    assert.ok(asked.includes("https://mods.factorio.com/api/mods/Squeak%20Through"));
+  }));
+
+test("GET /api/mods rejects no names, too many names, or a malformed name", () =>
+  withPortal({}, async (asked) => {
+    const tooMany = Array.from({ length: 41 }, (_, i) => `name=m${i}`).join("&");
+    for (const q of ["", tooMany, "name=..", "name=a/../b", "name=" + "x".repeat(101)]) {
+      const res = await worker.fetch(new Request(`https://x/api/mods?${q}`), makeEnv());
+      assert.equal(res.status, 400, q.slice(0, 40));
+      assert.equal(res.headers.get("Access-Control-Allow-Origin"), "*");
+    }
+    assert.equal(asked.length, 0, "nothing reaches the portal");
+  }));
+
+test("GET /api/mods leaves out mods it couldn't look up, and says not to cache that", () =>
+  withPortal({ "aai-loaders": { title: "AAI Loaders", thumbnail: "/assets/abc.thumb.png" } }, async () => {
+    const portal = globalThis.fetch;
+    globalThis.fetch = async (url) => (String(url).endsWith("/flaky") ? new Response("", { status: 503 }) : portal(url));
+    const res = await worker.fetch(new Request("https://x/api/mods?name=aai-loaders&name=flaky"), makeEnv());
+    assert.equal(res.status, 200);
+    assert.deepEqual(Object.keys((await res.json()).mods), ["aai-loaders"]);
+    assert.equal(res.headers.get("Cache-Control"), "no-store");
+
+    globalThis.fetch = async () => { throw new Error("network down"); };
+    const down = await worker.fetch(new Request("https://x/api/mods?name=aai-loaders"), makeEnv());
+    assert.equal(down.status, 200);
+    assert.deepEqual((await down.json()).mods, {});
+  }));

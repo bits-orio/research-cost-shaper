@@ -1,6 +1,7 @@
 // rcs-share: stores shared runs (an export + a curve) so the static
 // companion page can hand out short links. KV is the scarce free-tier
 // resource, so writes are dedup'd by content hash before touching it.
+// It also looks up mod portal details for the page (see handleMods).
 
 const MAX_BODY_BYTES = 300 * 1024; // 300 KB, well over a real export+curve
 const MAX_INFLATED_BYTES = 5 * 1024 * 1024; // guard against zip-bomb style input
@@ -206,6 +207,56 @@ async function handleGetShare(id, env) {
   });
 }
 
+// The mod portal's API sends no CORS headers, so the page asks here for the
+// title, summary and thumbnail of the mods in a run. Only the per-mod
+// endpoint carries the thumbnail, so it's one upstream call per mod; those
+// are edge-cached for a day, and the batch cap keeps a request inside the
+// free tier's 50-subrequest limit.
+const PORTAL = "https://mods.factorio.com";
+const PORTAL_ASSETS = "https://assets-mod.factorio.com";
+const MAX_MODS_PER_REQUEST = 40;
+const MOD_NAME_RE = /^[A-Za-z0-9_\- ]{1,100}$/;
+
+// null: the portal has no such mod (private or local). undefined: couldn't
+// tell right now, so the page keeps the link and may ask again later.
+async function portalMod(name) {
+  try {
+    const res = await fetch(`${PORTAL}/api/mods/${encodeURIComponent(name)}`, {
+      cf: { cacheTtlByStatus: { "200-299": 86400, 404: 3600, "500-599": 0 }, cacheEverything: true },
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) return undefined;
+    const m = await res.json();
+    // Mods without a thumbnail get the bare "/assets/.thumb.png" path.
+    const thumb = typeof m.thumbnail === "string" && !m.thumbnail.endsWith("/.thumb.png") ? `${PORTAL_ASSETS}${m.thumbnail}` : null;
+    return { title: m.title || name, owner: m.owner || null, summary: m.summary || "", downloads: m.downloads_count ?? null, thumbnail: thumb };
+  } catch {
+    return undefined;
+  }
+}
+
+async function handleMods(url) {
+  const names = [...new Set(url.searchParams.getAll("name"))];
+  if (names.length === 0 || names.length > MAX_MODS_PER_REQUEST || !names.every((n) => MOD_NAME_RE.test(n))) {
+    return new Response(JSON.stringify({ error: `Pass 1 to ${MAX_MODS_PER_REQUEST} valid mod names as ?name=.` }), {
+      status: 400,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+  const found = await Promise.all(names.map(portalMod));
+  const mods = Object.fromEntries(names.flatMap((n, i) => (found[i] === undefined ? [] : [[n, found[i]]])));
+  // A partial answer mustn't stick in the browser cache for a day.
+  const complete = found.every((m) => m !== undefined);
+  return new Response(JSON.stringify({ mods }), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": complete ? "public, max-age=86400" : "no-store",
+    },
+  });
+}
+
 function notFoundPage() {
   return new Response("<!doctype html><meta charset=\"utf-8\"><title>Not found</title><p>This share link doesn't exist.</p>", {
     status: 404,
@@ -259,6 +310,9 @@ export default {
     const shareMatch = pathname.match(/^\/api\/share\/([^/]+)$/);
     if (shareMatch && request.method === "GET") {
       return handleGetShare(shareMatch[1], env);
+    }
+    if (pathname === "/api/mods" && request.method === "GET") {
+      return handleMods(url);
     }
     const shortMatch = pathname.match(/^\/s\/([^/]+)$/);
     if (shortMatch && request.method === "GET") {
