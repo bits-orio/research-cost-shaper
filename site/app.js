@@ -2,6 +2,7 @@ import { createChart } from "./chart.js";
 import { createTree, HEAT_STOPS } from "./tree.js";
 import { play, setSound, soundEnabled } from "./sound.js";
 import { addRecent, listRecent, removeRecent, savedExport } from "./recent.js";
+import { initModLists, modList } from "./mods.js";
 
 const SHARE_API = "https://rcs-share.bits-orio.workers.dev";
 const Curve = window.RcsCurve;
@@ -47,18 +48,6 @@ function fmtHours(h) {
 const icon = (id) => `<svg class="icon"><use href="#i-${id}"/></svg>`;
 const packChips = (packs) =>
   `<span class="chips">${packs.map((p) => `<i style="background:${packColor(p)}" title="${packLabel(p)}"></i>`).join("")}</span>`;
-// Mods that ship with the game have no portal page.
-const BUILT_IN = new Set(["base", "core", "space-age", "quality", "elevated-rails", "recycler"]);
-// Portal mods first (linked), then the ones that ship with the game.
-function modList(mods) {
-  const portal = mods.filter(([n]) => !BUILT_IN.has(n));
-  const builtIn = mods.filter(([n]) => BUILT_IN.has(n));
-  const items = [
-    ...portal.map(([n, v]) => `<li><a href="https://mods.factorio.com/mod/${encodeURIComponent(n)}" target="_blank" rel="noopener" title="Open ${esc(n)} on the mod portal">${esc(n)}<svg class="icon ext"><use href="#i-external"/></svg></a> <span class="muted">${esc(v)}</span></li>`),
-    ...builtIn.map(([n, v], i) => `<li class="built-in${i === 0 && portal.length ? " first" : ""}">${esc(n)} <span class="muted">${esc(v)} · built in</span></li>`),
-  ];
-  return `<details class="mods"><summary>${mods.length} mod${mods.length === 1 ? "" : "s"}</summary><ul>${items.join("")}</ul></details>`;
-}
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 // ---------------------------------------------------------------- storage
@@ -598,6 +587,8 @@ $("#sound-toggle").addEventListener("click", () => { setSound(!soundEnabled()); 
 for (const id of ["#sample-dismiss", "#sample-dismiss-x"]) {
   $(id).addEventListener("click", () => { store.set("sampleDismissed", "1"); renderSource(); });
 }
+
+initModLists(SHARE_API);
 
 // Mod lists close when you click anywhere else, or press Escape.
 document.addEventListener("click", (e) => {

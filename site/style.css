@@ -252,13 +252,33 @@ dialog .field input { font-weight: 400; width: 100%; }
 
 /* mod lists */
 details.mods summary { cursor: pointer; color: var(--accent); }
-details.mods ul { position: absolute; z-index: 6; margin: 4px 0 0; padding: 8px 12px 8px 26px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; max-height: 50vh; overflow: auto; min-width: 240px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.18); }
-details.mods li { margin: 2px 0; }
-details.mods a { color: var(--share); font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; }
-details.mods a:hover { text-decoration: underline; text-underline-offset: 2px; }
-details.mods a .ext { width: 12px; height: 12px; opacity: 0.8; }
-details.mods li.built-in { color: var(--muted); }
-details.mods li.built-in.first { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+details.mods ul { position: absolute; z-index: 6; margin: 4px 0 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; max-height: 50vh; overflow: auto; min-width: 260px; max-width: min(400px, calc(100vw - 32px)); box-shadow: 0 6px 20px rgb(0 0 0 / 0.18); text-align: left; }
+details.mods li { display: flex; align-items: center; gap: 6px; margin: 0; padding: 3px 6px; border-radius: 6px; white-space: nowrap; }
+details.mods li[data-mod]:hover, details.mods li[data-mod]:focus-within { background: color-mix(in oklab, var(--share) 12%, transparent); }
+details.mods li .muted { margin-left: auto; padding-left: 8px; font-size: 12.5px; }
+details.mods a { color: var(--share); font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+details.mods a:hover .mod-name { text-decoration: underline; text-underline-offset: 2px; }
+details.mods a .ext { width: 12px; height: 12px; opacity: 0.8; margin-left: -4px; }
+.mod-name { overflow: hidden; text-overflow: ellipsis; }
+.mod-thumb { width: 28px; height: 28px; flex: none; border-radius: 4px; object-fit: cover; }
+.mod-thumb.blank { background: var(--line); }
+details.mods li.unlisted { gap: 8px; color: var(--muted); }
+details.mods li.built-in { color: var(--muted); padding-left: 42px; }
+details.mods li.built-in.first { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--line); border-radius: 0; }
+
+/* mod preview card: sits beside the list and ignores the pointer, so it
+   never gets between you and a link */
+.mod-card { position: fixed; z-index: 30; width: 320px; pointer-events: none; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; box-shadow: 0 10px 30px rgb(0 0 0 / 0.3); font-size: 13px; text-align: left; }
+.mod-card p { margin: 0; }
+.mod-card-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+.mod-card-thumb { width: 72px; height: 72px; flex: none; border-radius: 6px; object-fit: cover; }
+.mod-card-thumb.blank { background: var(--line); }
+.mod-card-title { font-weight: 700; font-size: 14.5px; line-height: 1.25; overflow-wrap: anywhere; }
+.mod-card-by { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+.mod-card-summary { line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.mod-card-note { color: var(--muted); margin-top: 4px; }
+.mod-card-foot { margin-top: 10px; color: var(--muted); font-size: 12px; }
+.mod-card-foot code { font-size: 11.5px; }
 
 /* tree colour switch and legend */
 .seg { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
