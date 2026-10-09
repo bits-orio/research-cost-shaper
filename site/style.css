@@ -352,15 +352,56 @@ button.link { display: inline-flex; align-items: center; gap: 4px; }
 .sample-close .icon { width: 20px; height: 20px; }
 .source .link .icon { width: 14px; height: 14px; }
 
-/* a tech's own cost, first in the panel */
-.own-big { font-size: 1.1rem; font-variant-numeric: tabular-nums; margin: 2px 0 4px !important; }
-.small { font-size: 12px; }
 .lvl { color: var(--muted); font-size: 11px; margin-left: 2px; }
-.tree-panel h3 .link { color: var(--muted); }
+
+/* the selected tech, styled after Factorio's technology tooltip; it stays
+   dark in both themes, as the game's does */
+.tree-panel.has-card {
+  --g-bg: #313031; --g-inset: #232223; --g-text: #e8e6e3; --g-dim: #a9a59f; --g-head: #ffe6c0;
+  --anc: #f5a052; --desc: #6fb2f5;
+  width: 360px; max-height: calc(100% - 20px); overflow: auto; padding: 0;
+  background: var(--g-bg); color: var(--g-text); border: 2px solid #121112; border-radius: 4px;
+  box-shadow: 0 0 0 1px #4a484a inset, 0 8px 28px rgb(0 0 0 / 0.5);
+  font-family: "Titillium Web", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.gcard-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 6px 5px 10px; background: linear-gradient(#f3ddb3, #dab47a); color: #1d1408; }
+.tree-panel.has-card h3 { margin: 0; font-size: 15px; font-weight: 700; display: block; }
+.gcard-close { display: inline-flex; background: none; border: 0; color: inherit; opacity: 0.65; cursor: pointer; padding: 2px; border-radius: 3px; }
+.gcard-close:hover { opacity: 1; background: rgb(0 0 0 / 0.12); }
+.gcard-body { padding: 2px 10px 10px; }
+.tree-panel.has-card h4 { display: flex; align-items: center; gap: 8px; margin: 10px 0 5px; font-size: 14px; font-weight: 700; color: var(--g-head); text-transform: none; letter-spacing: 0; }
+.tree-panel.has-card p { margin: 5px 0; }
+.tree-panel.has-card code { background: var(--g-inset); color: var(--g-text); }
+.gnote { color: var(--g-dim); font-size: 12px; }
+.gtag { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; background: #f0a030; color: #231500; cursor: help; }
+.gbox, .gcost, .gtotals { background: var(--g-inset); border-radius: 3px; box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.7); }
+.gbox { padding: 6px 8px; }
+.gcost { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 8px; }
+.gpacks { display: flex; flex-wrap: wrap; gap: 2px; }
+.gslot { position: relative; width: 30px; height: 30px; }
+.gslot .pack-icon { width: 30px; height: 30px; display: block; }
+.gslot b { position: absolute; right: -1px; bottom: -2px; font-size: 12px; line-height: 1; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 1px 1px 1px #000; }
+.gtime { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.gtime .icon { width: 17px; height: 17px; vertical-align: 0; }
+.gcount { margin-left: auto; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gcount code { white-space: normal; font-size: 12px; }
+.gtotals { display: flex; flex-wrap: wrap; gap: 6px 4px; padding: 6px; }
+.gtotal { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 42px; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: default; }
+.gtotal .pack-icon { width: 28px; height: 28px; display: block; }
+.gtable { margin: 8px 0 2px; font-size: 12.5px; }
+.gtable th, .gtable td { position: static; padding: 2px 0 2px 10px; border: 0; background: none; color: var(--g-dim); font-weight: 400; }
+.gtable thead th { font-size: 11.5px; text-align: right; }
+.gtable tbody th { padding-left: 0; text-align: left; white-space: normal; }
+.gtable td { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gtable tbody tr:hover { background: none; }
+.gtable tr.gnow th, .gtable tr.gnow td { color: #fff; font-weight: 700; }
+.gmult { color: #ffb45e; font-size: 11.5px; }
+.gcard-debug { display: grid; gap: 1px; padding: 6px 10px 8px; border-top: 1px solid #1d1c1d; font-size: 11.5px; color: var(--g-dim); overflow-wrap: anywhere; }
+.gcard-debug span::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #5aa9ff; vertical-align: 1px; }
+@media (max-width: 700px) { .tree-panel.has-card { width: auto; max-height: none; } }
 
 /* the curve on screen vs the one the game uses */
 .preview-notice, .switch-notice { font-size: 13px; border-radius: 8px; padding: 8px 10px; line-height: 1.45; }
 .preview-notice { background: color-mix(in oklab, #f0a030 16%, var(--surface)); border: 1px solid color-mix(in oklab, #f0a030 60%, transparent); }
 .switch-notice { background: color-mix(in oklab, var(--share) 12%, var(--surface)); border: 1px solid color-mix(in oklab, var(--share) 50%, transparent); }
 .preview-notice code { overflow-wrap: anywhere; }
-.in-game { margin: 0 0 4px; padding: 4px 8px; border-left: 3px solid #f0a030; background: color-mix(in oklab, #f0a030 10%, transparent); font-size: 12.5px; }

@@ -259,6 +259,11 @@ function renderStats() {
     match = bad.length
       ? `<p class="warn">${bad.length} techs differ from what the game applied: ${bad.slice(0, 5).map((r) => esc(r.name)).join(", ")}. Please report this.</p>`
       : `<p class="ok">Matches the costs the game applied, for all ${state.rows.length} techs.</p>`;
+  } else if (state.source.startsWith("Sample")) {
+    // A sample says nothing about your game, so don't claim it does.
+    match = `<div class="preview-notice"><b>Preview: the sample wasn't made with this curve.</b>
+      The sample was made with <code>${esc(state.exp.curve)}</code>. To see your own game's numbers, import your rcs-export.txt.
+      <button class="link" id="reset-curve">Show the sample's curve</button></div>`;
   } else {
     match = `<div class="preview-notice"><b>Preview: your game doesn't use this curve yet.</b>
       This export was made with <code>${esc(state.exp.curve)}</code>, so that's what your game has now.
@@ -266,7 +271,7 @@ function renderStats() {
       <button class="link" id="reset-curve">Show my game's curve</button></div>`;
   }
   if (state.previous) {
-    match += `<div class="switch-notice">Showing the curve this export was made with, which is what your game uses.
+    match += `<div class="switch-notice">Showing the curve this ${state.source.startsWith("Sample") ? "sample was made with" : "export was made with, which is what your game uses"}.
       <button class="link" id="use-previous">Switch back to the curve I was editing</button></div>`;
   }
   $("#stats").innerHTML = `
@@ -286,54 +291,125 @@ function renderSelection() {
   tree.update(state.rows, state.key, { ancestors: anc, descendants: desc });
   renderLegend();
   const panel = $("#tree-panel");
+  panel.classList.toggle("has-card", !!t);
   if (!t) {
     panel.innerHTML = `<p class="muted">Click a tech to see what it takes to reach it. Drag to pan, scroll to zoom.</p>`;
     return;
   }
-  const branch = state.rows.filter((r) => (anc.has(r.name) || r.name === name) && r.kind === "count" && !r.skipped);
-  const before = branch.reduce((a, r) => a + r.count, 0);
-  const after = branch.reduce((a, r) => a + r.now.count, 0);
   panel.innerHTML = `
-    <h3>${esc(name)} <button class="link" id="clear-sel" title="Clear selection">${icon("x")}</button></h3>
-    <h4>Its own cost</h4>
-    ${ownCost(t)}
-    <h4>To reach it</h4>
-    <p><b class="anc-key">${anc.size}</b> earlier techs · ${fmt(before)} → <b>${fmt(after)}</b> units, itself included<br>
-    ${fmtHours(before / state.spm / 60)} → <b>${fmtHours(after / state.spm / 60)}</b> at ${fmt(state.spm)} SPM</p>
-    <h4>Leads to</h4>
-    <p><b class="desc-key">${desc.size}</b> later techs</p>`;
+    <div class="gcard-head"><h3>${esc(techTitle(name))}</h3>
+      <button class="gcard-close" id="clear-sel" title="Clear selection" aria-label="Clear selection">${icon("x")}</button></div>
+    <div class="gcard-body">
+      ${costSection(t)}
+      ${reachSection(t, anc)}
+      <h4>Leads to</h4>
+      <p>${desc.size ? `<b class="desc-key">${desc.size}</b> later tech${desc.size === 1 ? "" : "s"}` : "Nothing after it."}</p>
+    </div>
+    <div class="gcard-debug"><span>technology-name: ${esc(name)}</span><span>curve position: ${t.x.toFixed(3)}</span></div>`;
   $("#clear-sel").addEventListener("click", () => { tree.select(null); });
 }
 
-// The selected tech's own research: what it costs before and after the curve,
-// or what unlocks it when science packs don't.
-function ownCost(t) {
-  const packs = packChips(Model.sortPacks(t.ingredients.map((i) => i[0]), state.rank));
-  const where = `<p class="muted small">Curve position ${t.x.toFixed(3)}</p>`;
-  if (t.kind === "trigger") {
-    return `<p class="own-big">No science cost</p>
-      <p>Unlocked by an action instead: <b>${esc(Model.describeTrigger(t.trigger))}</b>. The curve doesn't change triggers.</p>${where}`;
-  }
-  const each = t.time ? ` · ${fmt(t.now.time, 2)} s per unit` : "";
+// ---------------------------------------------------------------- tech card
+
+// The selected tech, laid out like Factorio's own technology tooltip: the
+// cost row reads the same as in game (packs per unit, seconds per unit,
+// × units), so the two can be compared at a glance. Below it, what the game
+// doesn't show: science packs in all, hours at your SPM, and the branch.
+
+const techTitle = (name) => name.charAt(0).toUpperCase() + name.slice(1).replace(/-/g, " ");
+const packIcon = (p) => `<svg class="pack-icon" style="color:${packColor(p)}" aria-hidden="true"><use href="#i-pack"/></svg>`;
+
+// Factorio's short form for big counts: 11814 → 11.8k.
+function fmtShort(n) {
+  if (n < 1e4) return fmt(n);
+  const [d, s] = n >= 1e12 ? [1e12, "T"] : n >= 1e9 ? [1e9, "G"] : n >= 1e6 ? [1e6, "M"] : [1e3, "k"];
+  return `${Number((n / d).toPrecision(3))}${s}`;
+}
+
+/** Science pack icons with a total under each, like a row of inventory slots. */
+const packTotals = (packs, total, tip) => `<div class="gtotals">${packs.map((p) =>
+  `<span class="gtotal" title="${esc(tip(p))}">${packIcon(p)}<span>${fmtShort(total(p))}</span></span>`).join("")}</div>`;
+
+function costSection(t) {
   const previewing = !Model.sameSpec(Curve.parse(state.exp.curve)[0], state.spec);
-  const gameNow = t.kind === "formula" ? window.RcsFormula.evaluate(t.game.formula, t.level) : t.game.count;
-  const inGame = previewing && gameNow != null
-    ? `<p class="in-game">In your game now: <b>${fmt(Math.round(gameNow))}</b> units (the export's curve). The number above is this page's preview.</p>`
+  if (t.kind === "trigger") {
+    return `<h4>Cost</h4>
+      <p class="gbox">No science packs. Unlocked by: <b>${esc(Model.describeTrigger(t.trigger))}</b></p>
+      <p class="gnote">The curve doesn't change triggers.</p>`;
+  }
+  const amount = new Map(t.ingredients);
+  const packs = Model.sortPacks([...amount.keys()], state.rank);
+  const units = costAfter(t);
+  const tag = previewing && !t.skipped
+    ? ` <span class="gtag" title="This page's curve. Your game keeps the export's curve until you copy this one into the Cost curve setting and restart.">Preview</span>`
     : "";
-  const packsLine = `<p>${packs} ${t.ingredients.length} pack${t.ingredients.length === 1 ? "" : "s"} per unit${each}</p>`;
-  if (t.skipped) {
-    return `<p class="own-big">${fmt(t.count)} units</p><p class="muted">Unchanged: this tech opts out of cost multipliers.</p>${packsLine}${where}`;
+  const slots = packs.map((p) => `<span class="gslot" title="${esc(techTitle(p))}: ${fmt(amount.get(p))} per unit">${packIcon(p)}<b>${fmt(amount.get(p))}</b></span>`).join("");
+  const time = t.now.time != null ? `<span class="gtime" title="Seconds per unit">${icon("clock")}${fmt(t.now.time, 2)}</span>` : "";
+  const count = units != null ? `× ${fmt(units)}` : `<code>${esc(t.now.formula)}</code>`;
+  const level = t.kind !== "formula" ? ""
+    : `<p class="gnote">Level ${t.level}${t.maxLevel === "infinite" ? " (infinite)" : t.maxLevel ? ` of ${t.maxLevel}` : ""}. Each level costs <code>${esc(t.now.formula)}</code> units.</p>`;
+  return `<h4>Cost${tag}</h4>
+    <div class="gcost"><span class="gpacks">${slots}</span>${time}<span class="gcount">${count}</span></div>
+    ${level}${units != null ? packsInAll(packs, amount, units, t.kind === "formula") : ""}
+    ${compareTable(t, previewing)}`;
+}
+
+// Units turned into science packs, the way you'd stock them.
+function packsInAll(packs, amount, units, perLevel) {
+  const lead = perLevel ? "This level needs" : "Needs";
+  const per = new Set(packs.map((p) => amount.get(p)));
+  if (per.size > 1) return `<p>${lead}:</p>${packTotals(packs, (p) => units * amount.get(p), (p) => `${techTitle(p)}: ${fmt(units * amount.get(p))}`)}`;
+  const each = units * amount.get(packs[0]);
+  return packs.length === 1
+    ? `<p>${lead} <b>${fmt(each)}</b> ${esc(techTitle(packs[0]).toLowerCase())}s.</p>`
+    : `<p>${lead} <b>${fmt(each)}</b> of each science pack, ${fmt(each * packs.length)} in all.</p>`;
+}
+
+// This tech's units under each curve that matters: none, the one the export
+// was made with (when the page previews another), and the page's.
+function compareTable(t, previewing) {
+  if (t.skipped) return `<p class="gnote">Unchanged: this tech opts out of cost multipliers.</p>`;
+  const before = costBefore(t), after = costAfter(t);
+  if (before == null || after == null) return "";
+  const sample = state.source.startsWith("Sample");
+  const exported = sample ? "Sample's curve" : "Your game's curve";
+  const gameNow = t.kind === "formula" ? window.RcsFormula.evaluate(t.game.formula, t.level) : t.game.count;
+  const row = (label, units, cls = "") =>
+    `<tr class="${cls}"><th>${label}</th><td>${fmt(units)}</td><td>${fmtHours(units / state.spm / 60)}</td></tr>`;
+  return `<table class="gtable">
+    <thead><tr><th></th><th>Units</th><th>At ${fmt(state.spm)} SPM</th></tr></thead>
+    <tbody>
+      ${row("Without the curve", before)}
+      ${previewing && gameNow != null ? row(exported, Math.round(gameNow)) : ""}
+      ${row(`${previewing ? "Preview curve" : exported} <span class="gmult">×${fmt(t.now.multiplier, 2)}</span>`, after, "gnow")}
+    </tbody></table>`;
+}
+
+// Everything it takes to get here: this tech and every tech before it, in
+// science packs and in time.
+function reachSection(t, anc) {
+  if (!anc.size) return `<h4>To reach it</h4><p>Nothing before it: available from the start.</p>`;
+  let before = 0, after = 0, triggers = 0;
+  const per = new Map();
+  for (const r of state.rows) {
+    if (!anc.has(r.name) && r.name !== t.name) continue;
+    if (r.kind === "trigger") { if (r.name !== t.name) triggers++; continue; }
+    const b = costBefore(r), a = costAfter(r);
+    if (b == null || a == null) continue;
+    before += b;
+    after += a;
+    for (const [p, n] of r.ingredients) {
+      const e = per.get(p) || per.set(p, { b: 0, a: 0 }).get(p);
+      e.b += b * n;
+      e.a += a * n;
+    }
   }
-  if (t.kind === "formula") {
-    const lvl = t.maxLevel === "infinite" ? `level ${t.level}, then every level after it` : `level ${t.level}${t.maxLevel ? ` of ${t.maxLevel}` : ""}`;
-    const numbers = t.levelCost != null
-      ? `<p class="own-big">${fmt(t.levelCost)} → <b>${fmt(t.now.levelCost)}</b> units <span class="muted">×${fmt(t.now.multiplier, 2)}</span></p>`
-      : `<p class="own-big"><code>${esc(t.now.formula)}</code></p>`;
-    return `${numbers}${inGame}<p class="muted">Cost of ${lvl}; each level follows <code>${esc(t.now.formula)}</code>.</p>${packsLine}
-      <p>${fmtHours((t.now.levelCost ?? 0) / state.spm / 60)} for this level at ${fmt(state.spm)} SPM</p>${where}`;
-  }
-  return `<p class="own-big">${fmt(t.count)} → <b>${fmt(t.now.count)}</b> units <span class="muted">×${fmt(t.now.multiplier, 2)}</span></p>
-    ${inGame}${packsLine}<p>${fmtHours(t.count / state.spm / 60)} → <b>${fmtHours(t.now.count / state.spm / 60)}</b> at ${fmt(state.spm)} SPM</p>${where}`;
+  const packs = Model.sortPacks([...per.keys()], state.rank);
+  const hours = (u) => fmtHours(u / state.spm / 60);
+  return `<h4>To reach it</h4>
+    <p><b class="anc-key">${anc.size}</b> earlier tech${anc.size === 1 ? "" : "s"}${triggers ? ` (${triggers} unlocked by triggers)` : ""}${t.kind === "trigger" ? "" : ", plus this one,"} need:</p>
+    ${packTotals(packs, (p) => per.get(p).a, (p) => `${techTitle(p)}: ${fmt(per.get(p).a)} (${fmt(per.get(p).b)} without the curve)`)}
+    <p><b>${hours(after)}</b> at ${fmt(state.spm)} SPM <span class="gnote">· ${hours(before)} without the curve</span></p>`;
 }
 
 // Cost shown in the tables and tree: count techs by count, formula techs by
