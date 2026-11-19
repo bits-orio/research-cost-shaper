@@ -1,4 +1,10 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.1.1
+Date: 2026-11-19
+  Changes:
+    - Every multiplier in the curve (the points, infinite research and research time) can be at most 100,000, the ceiling of Factorio's own technology price multiplier. A larger value stops the game at launch with a message that names it.
+    - rcs-report.txt writes large multipliers in full (x100,000) instead of in scientific notation.
+---------------------------------------------------------------------------------------------------
 Version: 0.1.0
 Date: 2026-09-27
   Features:
