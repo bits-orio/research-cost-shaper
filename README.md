@@ -7,7 +7,7 @@ each tech's new cost before you start a run.
 
 ## Status
 
-First release (0.1.0 for Factorio 2.0, 0.2.0 for 2.1, from the same code). The mod applies the curve at every game launch to whatever techs your
+Every release comes as a pair from the same code: 0.1.x for Factorio 2.0 and 0.2.x for 2.1. The mod applies the curve at every game launch to whatever techs your
 modpack has. At each launch it also writes `rcs-report.txt` (per-tech costs) and
 `rcs-export.txt` (for the companion page) to `script-output/research-cost-shaper/`;
 `/rcs-export` shows the same export in game. When a game starts, the mod checks
@@ -76,8 +76,10 @@ the 2.1 line (minor + 1: 0.2.x, 0.4.x, ...).
    (`docs/portal.md`, `tools/portal_meta.json`) and gallery (`docs/gallery/`).
 3. `tools/portal_check.py` confirms the live page matches the repo.
 
-`python3 tools/gen_thumbnail.py` redraws `thumbnail.png`; `dev/run-gui.sh`
-starts an isolated graphical client for screenshots.
+`python3 tools/gen_thumbnail.py` redraws `thumbnail.png`. `dev/run-tests.sh`
+runs the Lua and JS tests, then loads the mod in Factorio headless;
+`dev/run-gui.sh` starts an isolated graphical client for screenshots, on a
+private display (needs `xvfb`), and `dev/gui-drive.sh` drives it.
 
 Developed with AI coding assistants alongside human review and in-game testing.
 
